@@ -1,0 +1,922 @@
+app:
+  description: 基于亚马逊2026年7月新规的 AI Listing 生成与质检工作流。支持自然语言输入，按需生成标题/五点/Item Highlights/后台词，双
+    LLM 质检 + 自动重生成闭环，确保标题≤75字符且合规可发布。
+  icon: purple_heart
+  icon_background: '#FBE8FF'
+  icon_type: emoji
+  mode: advanced-chat
+  name: AI Listing 生成质检工作流
+  use_icon_as_answer_icon: false
+dependencies:
+- current_identifier: null
+  type: marketplace
+  value:
+    marketplace_plugin_unique_identifier: langgenius/deepseek:0.0.19@1aa3c64e2f50179afe8410ad79412dab92bf5919a27da8e2b13071b5e5f8ce81
+    version: null
+- current_identifier: null
+  type: marketplace
+  value:
+    marketplace_plugin_unique_identifier: langgenius/zhipuai:0.0.32@04ca8314bdb2f07541a710dc55456c216e5aef371d3b78267ede81015a2b9091
+    version: null
+kind: app
+version: 0.7.0
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      allowed_file_extensions:
+      - .JPG
+      - .JPEG
+      - .PNG
+      - .GIF
+      - .WEBP
+      - .SVG
+      allowed_file_types:
+      - image
+      allowed_file_upload_methods:
+      - local_file
+      - remote_url
+      enabled: false
+      fileUploadConfig:
+        attachment_image_file_size_limit: 2
+        audio_file_size_limit: 50
+        batch_count_limit: 5
+        file_size_limit: 15
+        file_upload_limit: 50
+        image_file_batch_limit: 10
+        image_file_size_limit: 10
+        knowledge_file_size_limit: 15
+        single_chunk_attachment_limit: 10
+        video_file_size_limit: 100
+        workflow_file_upload_limit: 10
+      image:
+        enabled: false
+        number_limits: 3
+        transfer_methods:
+        - local_file
+        - remote_url
+      number_limits: 3
+    opening_statement: ''
+    retriever_resource:
+      enabled: true
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+      language: ''
+      voice: ''
+  graph:
+    edges:
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: start
+        targetType: knowledge-retrieval
+      id: 1785988347843-source-1786608707687-target
+      selected: false
+      source: '1785988347843'
+      sourceHandle: source
+      target: '1786608707687'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: knowledge-retrieval
+        targetType: llm
+      id: 1786608707687-source-llm-target
+      selected: false
+      source: '1786608707687'
+      sourceHandle: source
+      target: llm
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: llm
+        targetType: llm
+      id: llm-source-1785997805094-target
+      selected: false
+      source: llm
+      sourceHandle: source
+      target: '1785997805094'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: llm
+        targetType: code
+      id: 1785997805094-source-1786957848487-target
+      selected: false
+      source: '1785997805094'
+      sourceHandle: source
+      target: '1786957848487'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: code
+        targetType: if-else
+      id: 1786957848487-source-1786957999671-target
+      selected: false
+      source: '1786957848487'
+      sourceHandle: source
+      target: '1786957999671'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: if-else
+        targetType: llm
+      id: 1786957999671-false-17869582996690-target
+      selected: false
+      source: '1786957999671'
+      sourceHandle: 'false'
+      target: '17869582996690'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: if-else
+        targetType: code
+      id: 1786957999671-true-1786958804357-target
+      selected: false
+      source: '1786957999671'
+      sourceHandle: 'true'
+      target: '1786958804357'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: llm
+        targetType: llm
+      id: 17869582996690-source-17869589823120-target
+      selected: false
+      source: '17869582996690'
+      sourceHandle: source
+      target: '17869589823120'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: llm
+        targetType: code
+      id: 17869589823120-source-17869594690530-target
+      selected: false
+      source: '17869589823120'
+      sourceHandle: source
+      target: '17869594690530'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: code
+        targetType: if-else
+      id: 17869594690530-source-17869597947390-target
+      selected: false
+      source: '17869594690530'
+      sourceHandle: source
+      target: '17869597947390'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: if-else
+        targetType: code
+      id: 17869597947390-true-1786958804357-target
+      selected: false
+      source: '17869597947390'
+      sourceHandle: 'true'
+      target: '1786958804357'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: code
+        targetType: answer
+      id: 1786958804357-source-1786010772643-target
+      selected: false
+      source: '1786958804357'
+      sourceHandle: source
+      target: '1786010772643'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: llm
+        targetType: llm
+      id: 17869604597020-source-17869605346100-target
+      selected: false
+      source: '17869604597020'
+      sourceHandle: source
+      target: '17869605346100'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: llm
+        targetType: code
+      id: 17869605346100-source-1786958804357-target
+      selected: false
+      source: '17869605346100'
+      sourceHandle: source
+      target: '1786958804357'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: if-else
+        targetType: llm
+      id: 17869597947390-false-17869604597020-target
+      source: '17869597947390'
+      sourceHandle: 'false'
+      target: '17869604597020'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    nodes:
+    - data:
+        selected: false
+        title: 用户输入
+        type: start
+        variables: []
+      height: 73
+      id: '1785988347843'
+      position:
+        x: -125.44369621537254
+        y: 442.96740512472104
+      positionAbsolute:
+        x: -125.44369621537254
+        y: 442.96740512472104
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+      zIndex: 0
+    - data:
+        context:
+          enabled: true
+          variable_selector:
+          - '1786608707687'
+          - result
+        model:
+          completion_params:
+            temperature: 0.7
+          mode: chat
+          name: deepseek-v4-flash
+          provider: langgenius/deepseek/deepseek
+        prompt_template:
+        - id: 0e3acd22-7996-4a96-b86d-92b1321d341a
+          role: system
+          text: "你是一名亚马逊Listing专家。请按以下步骤执行：\n\n第1步 意图解析\n读取用户的自然语言输入 {{#sys.query#}}，判断用户想生成哪些部分。\n\
+            可选部分：title(标题)、highlights(Item Highlights)、bullets(五点描述)、backend(后台搜索词)。\n\
+            将结果输出为 requested_parts 数组，例如 [\"title\"] 或 [\"title\",\"bullets\"]。\n\
+            如果用户未指定，默认输出 [\"title\",\"highlights\",\"bullets\",\"backend\"]。\n\n第2步\
+            \ 规则参考\n使用以下检索结果作为亚马逊平台规则参考，请严格遵守：\n{{#context#}}\n\n第3步 按需生成\n仅生成 requested_parts\
+            \ 中包含的部分，未要求的部分不要输出。\n标题必须 ≤75 字符（含空格）。生成后自查字符数，超出必须精简到 75 以内再输出，并如实填入\
+            \ title_length 与 title_compliant。。\n\n输出必须是纯JSON，不要添加任何注释或代码围栏：\n{\n \
+            \ \"requested_parts\": [\"title\",\"highlights\",\"bullets\",\"backend\"\
+            ],\n  \"title\": \"Adjustable 16 Inch Kids Bicycle with Training Wheels\"\
+            ,\n  \"title_length\": 47,\n  \"title_compliant\": true,\n  \"highlights\"\
+            : [\"Adjustable Seat\", \"Training Wheels Included\", \"Sturdy Steel Frame\"\
+            ],\n  \"bullets\": [\"Designed for kids aged 4-7\", \"Includes removable\
+            \ training wheels\", \"Lightweight steel frame\", \"Durable design\",\
+            \ \"Easy assembly\"],\n  \"backend\": [\"kids bicycle\", \"training wheels\
+            \ bike\", \"adjustable seat bike\", \"16 inch kids bike\"],\n  \"reason\"\
+            : \"说明生成依据\"\n}"
+        selected: false
+        structured_output_enabled: false
+        title: LLM A
+        type: llm
+        vision:
+          enabled: false
+      height: 88
+      id: llm
+      position:
+        x: 385.65096703269353
+        y: 449.2378086329261
+      positionAbsolute:
+        x: 385.65096703269353
+        y: 449.2378086329261
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+      zIndex: 0
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        model:
+          completion_params:
+            temperature: 0.7
+          mode: chat
+          name: deepseek-v4-flash
+          provider: langgenius/deepseek/deepseek
+        prompt_config:
+          jinja2_variables: []
+        prompt_template:
+        - edition_type: basic
+          id: f426b748-d160-45d6-b611-6f3508560084
+          role: system
+          text: "你是一名亚马逊Listing质检专家。请根据用户需求和亚马逊平台规则，对生成内容做质量评估。\n\n第1步 读取内容\n- 用户的原始自然语言需求：{{#sys.query#}}\n\
+            - 待质检的生成内容（JSON）：{{#llm.text#}}\n- 亚马逊平台规则参考：{{#context#}}\n\n第2步 确定评估范围\n\
+            仅评估 requested_parts 中明确要求的字段。用户未要求生成的字段（如未要 highlights 或 backend），即使为空也不判违规、不扣分。\n\
+            \n第3步 八维度评分（仅针对已生成字段）\n对每个已生成字段从以下维度打分（1-10）：\n关键词相关性、卖点吸引力、语法可读性、平台合规性（标题≤75字符、无禁用词）、COSMO/A9覆盖、2026新规合规（标题≤75、Item\
+            \ Highlights属性标签结构）、Alexa优化、多语言本地化。\n综合得分 = 八维平均分；≥8分为通过。\n\n第4步 输出\n\
+            输出纯JSON，不要代码围栏：\n{\n  \"score\": 8.5,\n  \"passed\": true,\n  \"hard_violation\"\
+            : false,\n  \"dimensions\": {\"关键词相关性\": 9, \"卖点吸引力\": 8, \"语法可读性\": 9,\
+            \ \"平台合规性\": 8, \"COSMO/A9覆盖\": 8, \"2026新规合规\": 8, \"Alexa优化\": 8, \"\
+            多语言本地化\": 8},\n  \"issues\": [],\n  \"suggestions\": [\"如有问题列出，无则空数组\"\
+            ]\n}"
+        selected: false
+        title: LLM B
+        type: llm
+        vision:
+          enabled: false
+      height: 88
+      id: '1785997805094'
+      position:
+        x: 636.9457291054155
+        y: 449.2378086329261
+      positionAbsolute:
+        x: 636.9457291054155
+        y: 449.2378086329261
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+      zIndex: 0
+    - data:
+        answer: '{{#1786958804357.result#}}'
+        selected: false
+        title: 直接回复
+        type: answer
+        variables: []
+      height: 103
+      id: '1786010772643'
+      position:
+        x: 2604.4172400267366
+        y: 478.87664464010226
+      positionAbsolute:
+        x: 2604.4172400267366
+        y: 478.87664464010226
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+      zIndex: 0
+    - data:
+        dataset_ids:
+        - vzqy/U1rmPdsjpS32hLhTNHU7lwKhsZw3uFIq8tHyXomO9iVMfqg7kuWuy8AsAWK
+        - 9DIMwnalMHFhp/0tznmK/oLZx8pHw8Sxlf01p1cos0XYj0y+cpDxFbbhPNjpGmXK
+        multiple_retrieval_config:
+          reranking_enable: false
+          reranking_mode: weighted_score
+          score_threshold: null
+          top_k: 5
+          weights:
+            keyword_setting:
+              keyword_weight: 0.3
+            vector_setting:
+              embedding_model_name: embedding-3
+              embedding_provider_name: langgenius/zhipuai/zhipuai
+              vector_weight: 0.7
+            weight_type: customized
+        query_attachment_selector: []
+        query_variable_selector:
+        - '1785988347843'
+        - sys.query
+        retrieval_mode: multiple
+        selected: false
+        title: 知识检索
+        type: knowledge-retrieval
+      height: 118
+      id: '1786608707687'
+      position:
+        x: 127.63785872545361
+        y: 449.2378086329261
+      positionAbsolute:
+        x: 127.63785872545361
+        y: 449.2378086329261
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+      zIndex: 0
+    - data:
+        code: "import json, re\ndef clean(t):\n    t = re.sub(r'<think>.*?</think>',\
+          \ '', t or '', flags=re.DOTALL)\n    t = re.sub(r'```json\\s*', '', t or\
+          \ '', flags=re.IGNORECASE)\n    t = re.sub(r'\\s*```', '', t or '')\n  \
+          \  s, e = (t or '').find('{'), (t or '').rfind('}')\n    if s != -1 and\
+          \ e > s:\n        t = t[s:e+1]\n    return t\ndef main(qa: str) -> dict:\n\
+          \    try:\n        d = json.loads(clean(qa))\n    except Exception:\n  \
+          \      d = {}\n    passed = d.get('passed', False)\n    if isinstance(passed,\
+          \ str):\n        passed = passed.lower() == 'true'\n    try:\n        score\
+          \ = float(d.get('score', 0))\n    except Exception:\n        score = 0\n\
+          \    issues = d.get('issues') or []\n    sugg = d.get('suggestions') or\
+          \ []\n    return {\n        \"b_passed\": bool(passed),\n        \"b_score\"\
+          : float(score),\n        \"b_issues\": \"\\n\".join(f\"- {i}\" for i in\
+          \ issues) if issues else \"无\",\n        \"b_suggestions\": \"\\n\".join(f\"\
+          - {s}\" for s in sugg) if sugg else \"无\"\n    }\n"
+        code_language: python3
+        outputs:
+          b_issues:
+            children: null
+            type: string
+          b_passed:
+            children: null
+            type: boolean
+          b_score:
+            children: null
+            type: number
+          b_suggestions:
+            children: null
+            type: string
+        selected: false
+        title: 代码执行 解析B1
+        type: code
+        variables:
+        - value_selector:
+          - '1785997805094'
+          - text
+          value_type: string
+          variable: qa
+      height: 52
+      id: '1786957848487'
+      position:
+        x: 935.1009045554692
+        y: 449.2378086329261
+      positionAbsolute:
+        x: 935.1009045554692
+        y: 449.2378086329261
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+      zIndex: 0
+    - data:
+        cases:
+        - case_id: 'true'
+          conditions:
+          - comparison_operator: is
+            id: 351d9284-753a-44ee-8649-e6490831b946
+            value: true
+            varType: boolean
+            variable_selector:
+            - '1786957848487'
+            - b_passed
+          id: 'true'
+          logical_operator: and
+        selected: false
+        title: 条件分支
+        type: if-else
+      height: 148
+      id: '1786957999671'
+      position:
+        x: 1235.1812984622925
+        y: 449.2378086329261
+      positionAbsolute:
+        x: 1235.1812984622925
+        y: 449.2378086329261
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+      zIndex: 0
+    - data:
+        context:
+          enabled: true
+          variable_selector:
+          - '1786608707687'
+          - result
+        desc: ''
+        isInIteration: false
+        isInLoop: false
+        model:
+          completion_params:
+            temperature: 0.7
+          mode: chat
+          name: deepseek-v4-flash
+          provider: langgenius/deepseek/deepseek
+        prompt_template:
+        - id: 0e3acd22-7996-4a96-b86d-92b1321d341a
+          role: system
+          text: "你是一名亚马逊Listing专家。请按以下步骤执行：\n\n第1步 意图解析\n读取用户的自然语言输入 {{#sys.query#}}，判断用户想生成哪些部分。\n\
+            可选部分：title(标题)、highlights(Item Highlights)、bullets(五点描述)、backend(后台搜索词)。\n\
+            将结果输出为 requested_parts 数组，例如 [\"title\"] 或 [\"title\",\"bullets\"]。\n\
+            如果用户未指定，默认输出 [\"title\",\"highlights\",\"bullets\",\"backend\"]。\n\n第2步\
+            \ 规则参考\n使用以下检索结果作为亚马逊平台规则参考，请严格遵守：\n{{#context#}}\n\n第3步 按需生成\n仅生成 requested_parts\
+            \ 中包含的部分，未要求的部分不要输出。\n标题必须 ≤75 字符（含空格）。生成后自查字符数，超出必须精简到 75 以内再输出，并如实填入\
+            \ title_length 与 title_compliant。\n\n输出必须是纯JSON，不要添加任何注释或代码围栏：\n{\n  \"\
+            requested_parts\": [\"title\",\"highlights\",\"bullets\",\"backend\"],\n\
+            \  \"title\": \"Adjustable 16 Inch Kids Bicycle with Training Wheels\"\
+            ,\n  \"title_length\": 47,\n  \"title_compliant\": true,\n  \"highlights\"\
+            : [\"Adjustable Seat\", \"Training Wheels Included\", \"Sturdy Steel Frame\"\
+            ],\n  \"bullets\": [\"Designed for kids aged 4-7\", \"Includes removable\
+            \ training wheels\", \"Lightweight steel frame\", \"Durable design\",\
+            \ \"Easy assembly\"],\n  \"backend\": [\"kids bicycle\", \"training wheels\
+            \ bike\", \"adjustable seat bike\", \"16 inch kids bike\"],\n  \"reason\"\
+            : \"说明生成依据\"\n}\n第4步 反馈修正\n你上一轮生成的内容被质检打回，原因与建议如下，请据此改进后重新生成（仅输出 requested_parts\
+            \ {中要求的部分，格式同前）：\n质检问题：\n{{#1786957848487.b_issues#}}\n优化建议：\n{{#1786957848487.b_suggestions#}}"
+        selected: false
+        structured_output_enabled: false
+        title: LLM A2
+        type: llm
+        vision:
+          enabled: false
+      height: 88
+      id: '17869582996690'
+      position:
+        x: 1192.7126310011336
+        y: 837.088889846001
+      positionAbsolute:
+        x: 1192.7126310011336
+        y: 837.088889846001
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+      zIndex: 0
+    - data:
+        code: "import json, re\ndef clean(t):\n    t = re.sub(r'<think>.*?</think>',\
+          \ '', t or '', flags=re.DOTALL)\n    t = re.sub(r'```json\\s*', '', t or\
+          \ '', flags=re.IGNORECASE)\n    t = re.sub(r'\\s*```', '', t or '')\n  \
+          \  s, e = (t or '').find('{'), (t or '').rfind('}')\n    if s != -1 and\
+          \ e > s:\n        t = t[s:e+1]\n    return t\ndef load(t):\n    try:\n \
+          \       return json.loads(clean(t))\n    except Exception:\n        return\
+          \ {}\ndef qa(t):\n    d = load(t)\n    passed = d.get('passed', False)\n\
+          \    if isinstance(passed, str):\n        passed = passed.lower() == 'true'\n\
+          \    try:\n        score = float(d.get('score', 0))\n    except Exception:\n\
+          \        score = 0\n    return passed, score, d\ndef render(g):\n    parts\
+          \ = g.get(\"requested_parts\", []) or [\"title\",\"highlights\",\"bullets\"\
+          ,\"backend\"]\n    lines = [\"## 生成结果\"]\n    if \"title\" in parts and\
+          \ g.get(\"title\"):\n        tl = g.get(\"title_length\") or len(g.get(\"\
+          title\",\"\"))\n        comp = g.get(\"title_compliant\")\n        lines\
+          \ += [f\"标题：{g['title']}\", f\"标题长度：{tl}字符\", f\"标题合规：{'✅ 合规' if comp else\
+          \ '❌ 不合规'}\", \"\"]\n    if \"bullets\" in parts and g.get(\"bullets\"):\n\
+          \        lines.append(\"五点描述：\")\n        for b in g[\"bullets\"]:\n   \
+          \         lines.append(f\"- {b}\")\n        lines.append(\"\")\n    if \"\
+          highlights\" in parts and g.get(\"highlights\"):\n        lines.append(\"\
+          Item Highlights：\")\n        for h in g[\"highlights\"]:\n            lines.append(f\"\
+          - {h}\")\n        lines.append(\"\")\n    if \"backend\" in parts and g.get(\"\
+          backend\"):\n        lines.append(\"后台搜索词：\")\n        for b in g[\"backend\"\
+          ]:\n            lines.append(f\"- {b}\")\n        lines.append(\"\")\n \
+          \   return \"\\n\".join(lines)\ndef main(a1,a2,a3,b1,b2,b3) -> dict:\n \
+          \   rounds = [(a1,b1),(a2,b2),(a3,b3)]\n    best = None\n    best_score\
+          \ = -1\n    for a, b in rounds:\n        if not a and not b:\n         \
+          \   continue\n        g = load(a)\n        passed, score, qd = qa(b)\n \
+          \       if passed:\n            best = (g, qd)\n            break\n    \
+          \    if score > best_score:\n            best_score = score\n          \
+          \  best = (g, qd)\n    if best is None:\n        best = (load(a1), qa(b1)[2])\n\
+          \    g, qd = best\n    out = [render(g)]\n    out.append(\"## 质检报告\")\n\
+          \    out.append(f\"状态：{'✅ 合格，可发布' if qd.get('passed') else '❌ 不合格，需重写'}\"\
+          )\n    out.append(f\"综合得分：{qd.get('score','N/A')}/10\")\n    out.append(f\"\
+          硬门槛违规：{'有' if qd.get('hard_violation') else '无'}\")\n    out.append(\"\"\
+          )\n    out.append(\"各维度评分：\")\n    for k, v in (qd.get('dimensions') or\
+          \ {}).items():\n        out.append(f\"- {k}：{v}/10\")\n    issues = qd.get('issues')\
+          \ or []\n    if issues:\n        out.append(\"\"); out.append(\"问题：\")\n\
+          \        for i in issues: out.append(f\"- {i}\")\n    sugg = qd.get('suggestions')\
+          \ or []\n    if sugg:\n        out.append(\"\"); out.append(\"优化建议：\")\n\
+          \        for s in sugg: out.append(f\"- {s}\")\n    return {\"result\":\
+          \ \"\\n\".join(out)}\n"
+        code_language: python3
+        outputs:
+          result:
+            children: null
+            type: string
+        selected: false
+        title: 多轮择优代码
+        type: code
+        variables:
+        - value_selector:
+          - llm
+          - text
+          value_type: string
+          variable: a1
+        - value_selector:
+          - '1785997805094'
+          - text
+          value_type: string
+          variable: b1
+        - value_selector:
+          - '17869582996690'
+          - text
+          value_type: string
+          variable: a2
+        - value_selector:
+          - '17869589823120'
+          - text
+          value_type: string
+          variable: b2
+        - value_selector:
+          - '17869604597020'
+          - text
+          value_type: string
+          variable: a3
+        - value_selector:
+          - '17869605346100'
+          - text
+          value_type: string
+          variable: b3
+      height: 52
+      id: '1786958804357'
+      position:
+        x: 2231.7892625512864
+        y: 478.87664464010226
+      positionAbsolute:
+        x: 2231.7892625512864
+        y: 478.87664464010226
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+      zIndex: 0
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        desc: ''
+        isInIteration: false
+        isInLoop: false
+        model:
+          completion_params:
+            temperature: 0.7
+          mode: chat
+          name: deepseek-v4-flash
+          provider: langgenius/deepseek/deepseek
+        prompt_config:
+          jinja2_variables: []
+        prompt_template:
+        - edition_type: basic
+          id: f426b748-d160-45d6-b611-6f3508560084
+          role: system
+          text: "你是一名亚马逊Listing质检专家。请根据用户需求和亚马逊平台规则，对生成内容做质量评估。\n\n第1步 读取内容\n- 用户的原始自然语言需求：{{#sys.query#}}\n\
+            - 待质检的生成内容（JSON）：{{#17869582996690.text#}}/\n- 亚马逊平台规则参考：{{#context#}}\n\
+            \n第2步 确定评估范围\n仅评估 requested_parts 中明确要求的字段。用户未要求生成的字段（如未要 highlights 或\
+            \ backend），即使为空也不判违规、不扣分。\n\n第3步 八维度评分（仅针对已生成字段）\n对每个已生成字段从以下维度打分（1-10）：\n\
+            关键词相关性、卖点吸引力、语法可读性、平台合规性（标题≤75字符、无禁用词）、COSMO/A9覆盖、2026新规合规（标题≤75、Item\
+            \ Highlights属性标签结构）、Alexa优化、多语言本地化。\n综合得分 = 八维平均分；≥8分为通过。\n\n第4步 输出\n\
+            输出纯JSON，不要代码围栏：\n{\n  \"score\": 8.5,\n  \"passed\": true,\n  \"hard_violation\"\
+            : false,\n  \"dimensions\": {\"关键词相关性\": 9, \"卖点吸引力\": 8, \"语法可读性\": 9,\
+            \ \"平台合规性\": 8, \"COSMO/A9覆盖\": 8, \"2026新规合规\": 8, \"Alexa优化\": 8, \"\
+            多语言本地化\": 8},\n  \"issues\": [],\n  \"suggestions\": [\"如有问题列出，无则空数组\"\
+            ]\n}"
+        selected: false
+        title: LLM B2
+        type: llm
+        vision:
+          enabled: false
+      height: 88
+      id: '17869589823120'
+      position:
+        x: 1466.9843069445224
+        y: 837.088889846001
+      positionAbsolute:
+        x: 1466.9843069445224
+        y: 837.088889846001
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+      zIndex: 0
+    - data:
+        code: "import json, re\ndef clean(t):\n    t = re.sub(r'<think>.*?</think>',\
+          \ '', t or '', flags=re.DOTALL)\n    t = re.sub(r'```json\\s*', '', t or\
+          \ '', flags=re.IGNORECASE)\n    t = re.sub(r'\\s*```', '', t or '')\n  \
+          \  s, e = (t or '').find('{'), (t or '').rfind('}')\n    if s != -1 and\
+          \ e > s:\n        t = t[s:e+1]\n    return t\ndef main(qa: str) -> dict:\n\
+          \    try:\n        d = json.loads(clean(qa))\n    except Exception:\n  \
+          \      d = {}\n    passed = d.get('passed', False)\n    if isinstance(passed,\
+          \ str):\n        passed = passed.lower() == 'true'\n    try:\n        score\
+          \ = float(d.get('score', 0))\n    except Exception:\n        score = 0\n\
+          \    issues = d.get('issues') or []\n    sugg = d.get('suggestions') or\
+          \ []\n    return {\n        \"b_passed\": bool(passed),\n        \"b_score\"\
+          : float(score),\n        \"b_issues\": \"\\n\".join(f\"- {i}\" for i in\
+          \ issues) if issues else \"无\",\n        \"b_suggestions\": \"\\n\".join(f\"\
+          - {s}\" for s in sugg) if sugg else \"无\"\n    }\n"
+        code_language: python3
+        desc: ''
+        isInIteration: false
+        isInLoop: false
+        outputs:
+          b_issues:
+            children: null
+            type: string
+          b_passed:
+            children: null
+            type: boolean
+          b_score:
+            children: null
+            type: number
+          b_suggestions:
+            children: null
+            type: string
+        selected: false
+        title: 代码执行 解析B2
+        type: code
+        variables:
+        - value_selector:
+          - '17869589823120'
+          - text
+          value_type: string
+          variable: qa
+      height: 52
+      id: '17869594690530'
+      position:
+        x: 1725.9689217609703
+        y: 837.088889846001
+      positionAbsolute:
+        x: 1725.9689217609703
+        y: 837.088889846001
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+      zIndex: 0
+    - data:
+        cases:
+        - case_id: 'true'
+          conditions:
+          - comparison_operator: is
+            id: 351d9284-753a-44ee-8649-e6490831b946
+            value: true
+            varType: boolean
+            variable_selector:
+            - '17869594690530'
+            - b_passed
+          id: 'true'
+          logical_operator: and
+        desc: ''
+        isInIteration: false
+        isInLoop: false
+        selected: false
+        title: 条件分支2
+        type: if-else
+      height: 148
+      id: '17869597947390'
+      position:
+        x: 2014.80429133266
+        y: 837.088889846001
+      positionAbsolute:
+        x: 2014.80429133266
+        y: 837.088889846001
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+      zIndex: 0
+    - data:
+        context:
+          enabled: true
+          variable_selector:
+          - '1786608707687'
+          - result
+        desc: ''
+        isInIteration: false
+        isInLoop: false
+        model:
+          completion_params:
+            temperature: 0.7
+          mode: chat
+          name: deepseek-v4-flash
+          provider: langgenius/deepseek/deepseek
+        prompt_template:
+        - id: 0e3acd22-7996-4a96-b86d-92b1321d341a
+          role: system
+          text: "你是一名亚马逊Listing专家。请按以下步骤执行：\n\n第1步 意图解析\n读取用户的自然语言输入 {{#sys.query#}}，判断用户想生成哪些部分。\n\
+            可选部分：title(标题)、highlights(Item Highlights)、bullets(五点描述)、backend(后台搜索词)。\n\
+            将结果输出为 requested_parts 数组，例如 [\"title\"] 或 [\"title\",\"bullets\"]。\n\
+            如果用户未指定，默认输出 [\"title\",\"highlights\",\"bullets\",\"backend\"]。\n\n第2步\
+            \ 规则参考\n使用以下检索结果作为亚马逊平台规则参考，请严格遵守：\n{{#context#}}\n\n第3步 按需生成\n仅生成 requested_parts\
+            \ 中包含的部分，未要求的部分不要输出。\n标题必须 ≤75 字符（含空格）。生成后自查字符数，超出必须精简到 75 以内再输出，并如实填入\
+            \ title_length 与 title_compliant。\n\n输出必须是纯JSON，不要添加任何注释或代码围栏：\n{\n  \"\
+            requested_parts\": [\"title\",\"highlights\",\"bullets\",\"backend\"],\n\
+            \  \"title\": \"Adjustable 16 Inch Kids Bicycle with Training Wheels\"\
+            ,\n  \"title_length\": 47,\n  \"title_compliant\": true,\n  \"highlights\"\
+            : [\"Adjustable Seat\", \"Training Wheels Included\", \"Sturdy Steel Frame\"\
+            ],\n  \"bullets\": [\"Designed for kids aged 4-7\", \"Includes removable\
+            \ training wheels\", \"Lightweight steel frame\", \"Durable design\",\
+            \ \"Easy assembly\"],\n  \"backend\": [\"kids bicycle\", \"training wheels\
+            \ bike\", \"adjustable seat bike\", \"16 inch kids bike\"],\n  \"reason\"\
+            : \"说明生成依据\"\n}\n第4步 反馈修正\n你上一轮生成的内容被质检打回，原因与建议如下，请据此改进后重新生成（仅输出 requested_parts\
+            \ {中要求的部分，格式同前）：\n质检问题：\n{{#17869594690530.b_issues#}}\n优化建议：\n{{#17869594690530.b_suggestions#}}"
+        selected: false
+        structured_output_enabled: false
+        title: LLM A3
+        type: llm
+        vision:
+          enabled: false
+      height: 88
+      id: '17869604597020'
+      position:
+        x: 2361.55812380147
+        y: 931.1519000383904
+      positionAbsolute:
+        x: 2361.55812380147
+        y: 931.1519000383904
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+      zIndex: 0
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        desc: ''
+        isInIteration: false
+        isInLoop: false
+        model:
+          completion_params:
+            temperature: 0.7
+          mode: chat
+          name: deepseek-v4-flash
+          provider: langgenius/deepseek/deepseek
+        prompt_config:
+          jinja2_variables: []
+        prompt_template:
+        - edition_type: basic
+          id: f426b748-d160-45d6-b611-6f3508560084
+          role: system
+          text: "你是一名亚马逊Listing质检专家。请根据用户需求和亚马逊平台规则，对生成内容做质量评估。\n\n第1步 读取内容\n- 用户的原始自然语言需求：{{#sys.query#}}\n\
+            - 待质检的生成内容（JSON）：{{#17869604597020.text#}}\n- 亚马逊平台规则参考：{{#context#}}\n\
+            \n第2步 确定评估范围\n仅评估 requested_parts 中明确要求的字段。用户未要求生成的字段（如未要 highlights 或\
+            \ backend），即使为空也不判违规、不扣分。\n\n第3步 八维度评分（仅针对已生成字段）\n对每个已生成字段从以下维度打分（1-10）：\n\
+            关键词相关性、卖点吸引力、语法可读性、平台合规性（标题≤75字符、无禁用词）、COSMO/A9覆盖、2026新规合规（标题≤75、Item\
+            \ Highlights属性标签结构）、Alexa优化、多语言本地化。\n综合得分 = 八维平均分；≥8分为通过。\n\n第4步 输出\n\
+            输出纯JSON，不要代码围栏：\n{\n  \"score\": 8.5,\n  \"passed\": true,\n  \"hard_violation\"\
+            : false,\n  \"dimensions\": {\"关键词相关性\": 9, \"卖点吸引力\": 8, \"语法可读性\": 9,\
+            \ \"平台合规性\": 8, \"COSMO/A9覆盖\": 8, \"2026新规合规\": 8, \"Alexa优化\": 8, \"\
+            多语言本地化\": 8},\n  \"issues\": [],\n  \"suggestions\": [\"如有问题列出，无则空数组\"\
+            ]\n}"
+        selected: false
+        title: LLM B3
+        type: llm
+        vision:
+          enabled: false
+      height: 88
+      id: '17869605346100'
+      position:
+        x: 2317.4660877737883
+        y: 706.2825162972092
+      positionAbsolute:
+        x: 2317.4660877737883
+        y: 706.2825162972092
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+      zIndex: 0
+    viewport:
+      x: -465.5754158185837
+      y: -3.9153739606477984
+      zoom: 0.6299605403706594
+  rag_pipeline_variables: []

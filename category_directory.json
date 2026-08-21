@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "description": "Amazon 类目缓存/种子（非白名单）：已核实类目在此复用。系统支持任意类目——用户自然语言 → LLM 归一化 → 搜索 facets / 面包屑交叉验证 → 动态解析真实节点并爬取，命中后可写入此目录供复用。node_id 须经核实（Amazon 搜索左侧 facets 或 zg-bs-nav-tree 校验），禁止编造。",
+  "default_site": "amazon.com",
+  "default_language": "en_US",
+  "default_currency": "USD",
+  "categories": [
+    {
+      "key": "kids_bicycle",
+      "display_name": "Kids' Bicycles",
+      "node_id": "1265804011",
+      "dept": "sporting-goods",
+      "site": "amazon.com",
+      "currency": "USD",
+      "language": "en_US",
+      "seed_keywords": ["kids bike", "children bicycle", "training bike", "boy girl bike", "toddler bike"],
+      "example_asins": [],
+      "status": "active"
+    }
+  ]
+}
