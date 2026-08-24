@@ -29,6 +29,7 @@ def feishu_read_all():
                 "reviews": f.get("评论数"),
                 "quality": f.get("数据质量"),
                 "url": f.get("链接"),
+                "cat_node": f.get("类目节点ID"),
             })
         pt = d.get("page_token")
         url = (f"{rp.BASE_URL}/bitable/v1/apps/{rp.BASE_APP_TOKEN}"
@@ -89,9 +90,48 @@ def compute_anomalies(latest, prev):
     return out
 
 
-def build_query_payload():
-    """聚合并返回结构化数据: {stats, brands, anomalies, latest}."""
+def _resolve_node_from_dir(category):
+    """仅本地目录匹配(不联网), 返回 node_id 或 None. 供 /query 按类目过滤."""
+    try:
+        import crawl_category as cc
+        r = cc.resolve_from_directory(category, cc.load_dir())
+        return r["node"] if r else None
+    except Exception:
+        return None
+
+
+def _dir_display_names():
+    try:
+        import crawl_category as cc
+        return [c.get("display_name") for c in cc.load_dir()]
+    except Exception:
+        return []
+
+
+def build_query_payload(category=None, node=None):
+    """聚合并返回结构化数据: {stats, brands, anomalies, latest}.
+
+    可选过滤:
+      - category: 类目名/关键词, 按已核实目录解析出 node_id 后按类目过滤
+      - node:     直接传 Amazon 类目节点 ID
+    过滤后仅返回该类目数据, 供 Dify 按类目取竞品参考(多类目隔离)。
+    不传则保持原行为: 返回 Base 全量。
+    """
     rows = feishu_read_all()
+
+    # 按类目过滤(仅当显式传了 category 或 node)
+    if category and not node:
+        target = _resolve_node_from_dir(category)
+        if not target:
+            return {"error": "unknown_category",
+                    "msg": f"类目「{category}」未在已核实目录中, 无法按类目过滤",
+                    "hint": "请先在 crawl_category.py 用 --save-seed 固化节点, "
+                            "或直接传 ?node=<node_id>",
+                    "available_categories": _dir_display_names()}
+        rows = [r for r in rows if str(r.get("cat_node")) == str(target)]
+    elif node:
+        rows = [r for r in rows if str(r.get("cat_node")) == str(node)]
+
     by_date = {}
     for r in rows:
         if r.get("date"):
@@ -126,5 +166,7 @@ def build_query_payload():
         "price_median": (f"${sorted(prices)[len(prices)//2]:.2f}" if prices else "N/A"),
         "avg_rating": (round(sum(rates)/len(rates), 2) if rates else "N/A"),
         "missing_flag_count": sum(1 for x in latest if x.get("quality")),
+        "filter": ({"category": category, "node": node}
+                   if (category or node) else None),
     }
     return {"stats": stats, "brands": brands, "anomalies": anomalies, "latest": latest}

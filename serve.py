@@ -70,8 +70,12 @@ class Handler(BaseHTTPRequestHandler):
             if not _check_token(self.path):
                 self._send(403, {"error": "unauthorized"})
                 return
+            q = self.path.split("?", 1)[1] if "?" in self.path else ""
+            params = dict(x.split("=", 1) for x in q.split("&") if "=" in x)
             try:
-                self._send(200, qc.build_query_payload())
+                self._send(200, qc.build_query_payload(
+                    category=params.get("category"),
+                    node=params.get("node")))
             except Exception as e:
                 self._send(500, {"error": str(e)})
             return
@@ -102,11 +106,14 @@ class Handler(BaseHTTPRequestHandler):
         # 解析可选类目参数: ?category=自然语言 或 ?node=&dept=&name= (多类目现爬)
         q = self.path.split("?", 1)[1] if "?" in self.path else ""
         params = dict(x.split("=", 1) for x in q.split("&") if "=" in x)
-        # topk: 抓取前 N 名, 默认 50
+        # topk: 抓取前 N 名, 默认 50; sync 模式下默认降到 10 以适配 HTTP 超时
         try:
             topk = int(params.get("topk", 50))
         except ValueError:
             topk = 50
+        sync = params.get("sync") in ("1", "true", "True")
+        if sync and "topk" not in params:
+            topk = 10
         category = params.get("category")
         if category:
             # 自然语言任意类目 -> 自动解析真实节点 -> 现爬
@@ -118,6 +125,20 @@ class Handler(BaseHTTPRequestHandler):
                                          "或在 crawl_category.py 用 --save-seed 固化节点"})
                 return
             node, dept, name = resolved["node"], resolved["dept"], resolved["name"]
+            # 固化节点到目录(同实例内让 /query?category= 能解析; 重启后失效, 正式复用请 --save-seed)
+            try:
+                cc.save_seed(node, dept, name)
+            except Exception:
+                pass
+            if sync:
+                try:
+                    _run_and_report(node=node, dept=dept, name=name, topk=topk)
+                    self._send(200, {"status": "done",
+                                     "msg": f"已抓取并写入飞书 Base(category='{category}' -> node={node})",
+                                     "node": node, "name": name, "topk": topk})
+                except Exception as e:
+                    self._send(500, {"error": f"抓取失败: {e}"})
+                return
             threading.Thread(target=_run_and_report,
                              kwargs={"node": node, "dept": dept, "name": name, "topk": topk},
                              daemon=True).start()
@@ -128,6 +149,13 @@ class Handler(BaseHTTPRequestHandler):
         node = params.get("node")
         dept = params.get("dept")
         name = params.get("name")
+        if sync:
+            try:
+                _run_and_report(node=node, dept=dept, name=name, topk=topk)
+                self._send(200, {"status": "done", "msg": "抓取完成", "node": node})
+            except Exception as e:
+                self._send(500, {"error": f"抓取失败: {e}"})
+            return
         # 后台线程跑抓取(+可选推送), 立即返回 202, 避免飞书/网关超时
         threading.Thread(target=_run_and_report,
                          kwargs={"node": node, "dept": dept, "name": name, "topk": topk},
