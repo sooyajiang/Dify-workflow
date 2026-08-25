@@ -141,7 +141,7 @@ def _pick_search_nodes(html, top_n=5):
     return ordered[:top_n]
 
 
-def _bsr_links_near_text(html, text_window=600):
+def _bsr_links_near_text(html, text_window=800):
     """从 HTML 中定位 'Best Seller' 文本附近区域内的 BSR/zgbs 链接.
     避免详情页底部'相关推荐'等污染. 返回 [(dept, node), ...]."""
     # 找所有 Best Seller 出现位置
@@ -166,21 +166,27 @@ def _resolve_from_asin_detail(sess, query, max_asins=4):
     try:
         from concurrent.futures import ThreadPoolExecutor, as_completed
         kw = requests.utils.quote(query)
+        print(f"[resolve] search query={query}")
         r = sess.get(f"https://www.amazon.com/s?k={kw}", timeout=20)
+        print(f"[resolve] search status={r.status_code}")
         if r.status_code != 200:
             return None, None
         asins = re.findall(r'/dp/([A-Z0-9]{10})', r.text)
         asins = list(dict.fromkeys(asins))[:max_asins]
+        print(f"[resolve] asins={asins}")
         if not asins:
             return None, None
 
         def fetch_one(asin):
             try:
                 d = sess.get(f"https://www.amazon.com/dp/{asin}", timeout=15)
+                print(f"[resolve] detail {asin} status={d.status_code}")
                 if d.status_code == 200:
-                    return _bsr_links_near_text(d.text)
-            except Exception:
-                pass
+                    links = _bsr_links_near_text(d.text)
+                    print(f"[resolve] detail {asin} bsr_links={links}")
+                    return links
+            except Exception as e:
+                print(f"[resolve] detail {asin} err={e}")
             return []
 
         pair_counter = Counter()
@@ -189,12 +195,15 @@ def _resolve_from_asin_detail(sess, query, max_asins=4):
             for fut in as_completed(futures):
                 for dept, node in fut.result():
                     pair_counter[(dept, node)] += 1
+        print(f"[resolve] pair_counter={dict(pair_counter)}")
         if not pair_counter:
             return None, None
         # 取出现频率最高的 (dept, node)
-        (dept, node), _ = pair_counter.most_common(1)[0]
+        (dept, node), cnt = pair_counter.most_common(1)[0]
+        print(f"[resolve] picked dept={dept} node={node} cnt={cnt}")
         return dept, node
-    except Exception:
+    except Exception as e:
+        print(f"[resolve] exception {e}")
         return None, None
 
 
@@ -279,16 +288,20 @@ def resolve_from_search(query):
                     "conf": "medium", "src": "search", "ask": False}
         # 主逻辑: ASIN 详情页 BSR 路径反推(最准)
         dept, node = _resolve_from_asin_detail(sess, query)
+        print(f"[resolve] asin_detail dept={dept} node={node}")
         if dept and node:
             return {"node": node, "dept": dept, "name": query,
                     "conf": "medium", "src": "search", "ask": False}
         # Fallback: 从左侧 facet 提取候选 node 列表, 逐个探测真实 dept
         candidates = _pick_search_nodes(r.text)
+        print(f"[resolve] facet candidates={candidates}")
         for cand in candidates:
             dept, final_node = _probe_dept_node(sess, cand)
+            print(f"[resolve] probe cand={cand} -> dept={dept} node={final_node}")
             if dept and final_node:
                 return {"node": final_node, "dept": dept, "name": query,
                         "conf": "medium", "src": "search", "ask": False}
+        print("[resolve] no node resolved, hitl")
         return None
     except Exception:
         return None
