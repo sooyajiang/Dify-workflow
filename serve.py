@@ -68,7 +68,7 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(500, {"error": str(e)})
             return
         if path in ("/compete", "/compete/"):
-            # 一体化竞品接口(多类目闭环): 任意自然语言类目 -> 查缓存 -> 无则同步现爬 -> 返回结构化竞品
+            # 一体化竞品接口(多类目闭环): 任意自然语言类目 -> 三源交叉验证解析节点 -> 查本地缓存 -> 无则同步现爬 -> 返回结构化竞品
             if not _check_token(self.path):
                 self._send(403, {"error": "unauthorized"})
                 return
@@ -78,18 +78,7 @@ class Handler(BaseHTTPRequestHandler):
             if not category:
                 self._send(400, {"error": "缺少 category 参数(自然语言类目名, 如 'girl kids bicycle')"})
                 return
-            # 1) 先查已缓存竞品
-            try:
-                payload = qc.build_query_payload(category=category)
-            except Exception as e:
-                self._send(500, {"error": str(e)})
-                return
-            # 2) 命中缓存直接返回
-            if payload.get("error") != "unknown_category":
-                payload["_source"] = "cache"
-                self._send(200, payload)
-                return
-            # 3) 无缓存 -> 解析真实节点(三源交叉验证) -> 同步现爬 -> 再查
+            # 1) 先解析真实节点(面包屑/zgbs/node 三源交叉验证); 低置信会返回 ask 门控
             import crawl_category as cc
             try:
                 resolved = cc.resolve_category(category, cc.load_dir())
@@ -106,6 +95,17 @@ class Handler(BaseHTTPRequestHandler):
                 cc.save_seed(node, dept, name)
             except Exception:
                 pass
+            # 2) 按解析出的 node 查本地缓存
+            try:
+                payload = qc.build_query_payload(node=node)
+            except Exception as e:
+                self._send(500, {"error": str(e)})
+                return
+            if payload.get("stats", {}).get("latest_count", 0) > 0:
+                payload["_source"] = "cache"
+                self._send(200, payload)
+                return
+            # 3) 缓存无数据 -> 同步现爬 -> 再查
             try:
                 topk = int(params.get("topk", 10))
             except ValueError:
@@ -115,7 +115,7 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as e:
                 self._send(500, {"error": f"抓取失败: {e}"})
                 return
-            payload = qc.build_query_payload(category=category)
+            payload = qc.build_query_payload(node=node)
             payload["_source"] = "fresh_crawl"
             self._send(200, payload)
             return
