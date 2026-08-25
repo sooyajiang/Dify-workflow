@@ -141,10 +141,30 @@ def _pick_search_nodes(html, top_n=5):
     return ordered[:top_n]
 
 
-def _resolve_from_asin_detail(sess, query, max_asins=6):
-    """通过搜索结果 ASIN 详情页中的 BSR 类目路径反推真实 dept/node.
-    比 facet 更准, 因为详情页的类目路径直接对应商品."""
+def _bsr_links_near_text(html, text_window=600):
+    """从 HTML 中定位 'Best Seller' 文本附近区域内的 BSR/zgbs 链接.
+    避免详情页底部'相关推荐'等污染. 返回 [(dept, node), ...]."""
+    # 找所有 Best Seller 出现位置
+    positions = [m.start() for m in re.finditer(r'Best Seller', html, re.I)]
+    pairs = []
+    for pos in positions:
+        snippet = html[max(0, pos - text_window):pos + text_window]
+        # 提取 /gp/bestsellers/<dept>/<node> 和 /zgbs/<dept>/<node>
+        for dept, node in re.findall(r'/gp/bestsellers/([\w-]+)/(\d{9,})', snippet):
+            if node not in _AMAZON_ROOT_NODES:
+                pairs.append((dept, node))
+        for dept, node in re.findall(r'/zgbs/([\w-]+)/(\d{9,})', snippet):
+            if node not in _AMAZON_ROOT_NODES:
+                pairs.append((dept, node))
+    return pairs
+
+
+def _resolve_from_asin_detail(sess, query, max_asins=4):
+    """通过搜索结果 ASIN 详情页中的 'Best Sellers Rank' 链接反推真实 dept/node.
+    只取 BSR 文本附近的链接, 避免详情页推荐位污染.
+    并发抓详情页, 控制总耗时在 Render 免费实例网关耐心内."""
     try:
+        from concurrent.futures import ThreadPoolExecutor, as_completed
         kw = requests.utils.quote(query)
         r = sess.get(f"https://www.amazon.com/s?k={kw}", timeout=20)
         if r.status_code != 200:
@@ -153,15 +173,21 @@ def _resolve_from_asin_detail(sess, query, max_asins=6):
         asins = list(dict.fromkeys(asins))[:max_asins]
         if not asins:
             return None, None
+
+        def fetch_one(asin):
+            try:
+                d = sess.get(f"https://www.amazon.com/dp/{asin}", timeout=15)
+                if d.status_code == 200:
+                    return _bsr_links_near_text(d.text)
+            except Exception:
+                pass
+            return []
+
         pair_counter = Counter()
-        for asin in asins:
-            d = sess.get(f"https://www.amazon.com/dp/{asin}", timeout=20)
-            if d.status_code != 200:
-                continue
-            # 取页面内所有 zgbs 链接, 过滤根节点
-            links = re.findall(r'/zgbs/([\w-]+)/(\d{9,})', d.text)
-            for dept, node in links:
-                if node not in _AMAZON_ROOT_NODES:
+        with ThreadPoolExecutor(max_workers=3) as exe:
+            futures = [exe.submit(fetch_one, asin) for asin in asins]
+            for fut in as_completed(futures):
+                for dept, node in fut.result():
                     pair_counter[(dept, node)] += 1
         if not pair_counter:
             return None, None
