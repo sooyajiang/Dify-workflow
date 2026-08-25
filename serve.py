@@ -6,8 +6,7 @@
 启动:  python serve.py   (默认端口 8080, 可用环境变量 PORT 覆盖)
 接口:
   GET  /          健康检查
-  POST /run        触发抓取(可选 ?token=); 若环境变量 FEISHU_CHAT_ID 已设, 抓完自动推日报
-  GET  /report     手动推送一次日报到飞书(可选 ?token= &chat_id=)
+  POST /run        触发抓取(可选 ?token=); 写本地缓存, 不推送飞书
   GET  /query      返回结构化数据 JSON(供调试或独立助手使用)
   GET  /compete     一体化竞品接口(任意自然语言类目: 查缓存->无则同步现爬->返回结构化竞品); Dify 接实时竞品用此
 """
@@ -119,20 +118,8 @@ class Handler(BaseHTTPRequestHandler):
             payload["_source"] = "fresh_crawl"
             self._send(200, payload)
             return
-        if path in ("/report", "/report/"):
-            if not _check_token(self.path):
-                self._send(403, {"error": "unauthorized"})
-                return
-            q = self.path.split("?", 1)[1] if "?" in self.path else ""
-            params = dict(x.split("=", 1) for x in q.split("&") if "=" in x)
-            chat = params.get("chat_id") or os.environ.get("FEISHU_CHAT_ID")
-            open_id = params.get("open_id") or os.environ.get("FEISHU_USER_OPEN_ID")
-            try:
-                import feishu_report
-                self._send(200, feishu_report.run_report(chat, open_id))
-            except Exception as e:
-                self._send(500, {"error": str(e)})
-            return
+        # /report 端点已移除: 项目A 已彻底剥离飞书, 不再推送飞书日报
+        # (取实时竞品请用 GET /compete?category=自然语言)
         self._send(404, {"error": "not found"})
 
     def do_POST(self):
