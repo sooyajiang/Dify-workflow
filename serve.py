@@ -9,6 +9,7 @@
   POST /run        触发抓取(可选 ?token=); 若环境变量 FEISHU_CHAT_ID 已设, 抓完自动推日报
   GET  /report     手动推送一次日报到飞书(可选 ?token= &chat_id=)
   GET  /query      返回结构化数据 JSON(供调试或独立助手使用)
+  GET  /compete     一体化竞品接口(任意自然语言类目: 查缓存->无则同步现爬->返回结构化竞品); Dify 接实时竞品用此
 """
 import json
 import os
@@ -78,6 +79,58 @@ class Handler(BaseHTTPRequestHandler):
                     node=params.get("node")))
             except Exception as e:
                 self._send(500, {"error": str(e)})
+            return
+        if path in ("/compete", "/compete/"):
+            # 一体化竞品接口(多类目闭环): 任意自然语言类目 -> 查缓存 -> 无则同步现爬 -> 返回结构化竞品
+            if not _check_token(self.path):
+                self._send(403, {"error": "unauthorized"})
+                return
+            q = self.path.split("?", 1)[1] if "?" in self.path else ""
+            params = dict(x.split("=", 1) for x in q.split("&") if "=" in x)
+            category = params.get("category") or params.get("node")
+            if not category:
+                self._send(400, {"error": "缺少 category 参数(自然语言类目名, 如 'girl kids bicycle')"})
+                return
+            # 1) 先查已缓存竞品
+            try:
+                payload = qc.build_query_payload(category=category)
+            except Exception as e:
+                self._send(500, {"error": str(e)})
+                return
+            # 2) 命中缓存直接返回
+            if payload.get("error") != "unknown_category":
+                payload["_source"] = "cache"
+                self._send(200, payload)
+                return
+            # 3) 无缓存 -> 解析真实节点(三源交叉验证) -> 同步现爬 -> 再查
+            import crawl_category as cc
+            try:
+                resolved = cc.resolve_category(category, cc.load_dir())
+            except Exception as e:
+                self._send(500, {"error": f"类目解析失败: {e}"})
+                return
+            if resolved.get("ask"):
+                self._send(400, {"error": "无法高置信解析该类目",
+                                 "hint": "请贴 Amazon BSR 链接或显式传 node/dept/name",
+                                 "detail": resolved})
+                return
+            node, dept, name = resolved["node"], resolved["dept"], resolved["name"]
+            try:
+                cc.save_seed(node, dept, name)
+            except Exception:
+                pass
+            try:
+                topk = int(params.get("topk", 10))
+            except ValueError:
+                topk = 10
+            try:
+                _run_and_report(node=node, dept=dept, name=name, topk=topk)
+            except Exception as e:
+                self._send(500, {"error": f"抓取失败: {e}"})
+                return
+            payload = qc.build_query_payload(category=category)
+            payload["_source"] = "fresh_crawl"
+            self._send(200, payload)
             return
         if path in ("/report", "/report/"):
             if not _check_token(self.path):
