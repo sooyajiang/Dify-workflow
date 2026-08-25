@@ -138,6 +138,42 @@ def feishu_today_exists(token, today):
     return False
 
 
+# ---------------- 本地缓存(替代飞书, 项目A 不依赖飞书) ----------------
+CACHE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data_cache")
+
+def _rows_to_dicts(rows):
+    """长表行(14列) -> 与 feishu_read_all 一致的字典列表, 供 build_query_payload 复用."""
+    out = []
+    for r in rows:
+        out.append({
+            "date": r[0], "cat_node": r[1], "rank": r[2], "asin": r[3],
+            "brand": (r[4] or "未知"), "title": r[5], "price": r[6],
+            "rating": r[7], "reviews": r[8], "quality": r[13], "url": r[12],
+        })
+    return out
+
+def save_local(node, dicts, date):
+    """把某类目抓取结果存本地 JSON(按 node 隔离)."""
+    os.makedirs(CACHE_DIR, exist_ok=True)
+    path = os.path.join(CACHE_DIR, f"{node}.json")
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump({"node": node, "date": date, "rows": dicts}, f, ensure_ascii=False)
+
+def load_local_all():
+    """合并读取所有本地缓存类目, 返回字典列表(结构同 feishu_read_all)."""
+    rows = []
+    if not os.path.isdir(CACHE_DIR):
+        return rows
+    for fn in sorted(os.listdir(CACHE_DIR)):
+        if fn.endswith(".json"):
+            try:
+                d = json.load(open(os.path.join(CACHE_DIR, fn), encoding="utf-8"))
+                rows.extend(d.get("rows", []))
+            except Exception:
+                pass
+    return rows
+
+
 # ---------------- 抓取 ----------------
 session = requests.Session()
 session.headers.update(HEADERS)
@@ -335,11 +371,10 @@ def crawl_one(node, dept, name, topk=50, scrape_date=None, dry_run=False):
     if not rows:
         print("无数据, 终止.")
         return 0
-    recs = build_records(rows)
-    tok = feishu_token()
-    n = bitable_write(tok, recs)
-    print(f"完成: 已写入 {n} 条 ({name}) 到 Base.")
-    return n
+    dicts = _rows_to_dicts(rows)
+    save_local(node, dicts, sd)
+    print(f"完成: 已存 {len(dicts)} 条 ({name}) 到本地缓存.")
+    return len(dicts)
 
 
 # ---------------- 主流程 ----------------
@@ -412,23 +447,13 @@ def main():
     cats = load_categories()
     scrape_date = datetime.date.today().isoformat()
 
-    token = feishu_token()
-    if feishu_today_exists(token, scrape_date):
-        print(f"今日({scrape_date})数据已存在, 跳过写入以避免重复.")
-        return
-
-    all_rows = []
     for cat in cats:
-        all_rows.extend(process_category(cat, scrape_date))
-
-    if not all_rows:
-        print("无数据, 终止.")
-        return
-
-    records = build_records(all_rows)
-    n = bitable_write(token, records)
-    print(f"\n完成. 已写入 {n} 条记录到多维表格(Base): "
-          f"https://fcngircqho92.feishu.cn/base/{BASE_APP_TOKEN}?table={BASE_TABLE_ID}")
+        rows = process_category(cat, scrape_date)
+        if not rows:
+            continue
+        dicts = _rows_to_dicts(rows)
+        save_local(cat["node_id"], dicts, scrape_date)
+    print(f"\n完成. 已存 {len(cats)} 个类目到本地缓存(data_cache/).")
 
 
 if __name__ == "__main__":

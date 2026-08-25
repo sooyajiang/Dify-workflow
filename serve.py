@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """云端部署入口(脱离 WorkBuddy): 把 run_pipeline 暴露为 HTTP 接口,
-让飞书 Base 定时自动化 / 任意 Webhook 触发抓取, 并在抓取后自动推送飞书日报.
+支持 /run 触发抓取(写本地缓存) 与 /compete 取实时竞品. 不依赖飞书(项目A 已剥离).
 
 零依赖(仅标准库 + requests), 部署到 Render / Railway / VPS.
 启动:  python serve.py   (默认端口 8080, 可用环境变量 PORT 覆盖)
@@ -34,24 +34,11 @@ def _check_token(path):
 
 
 def _run_and_report(node=None, dept=None, name=None, topk=50):
-    """抓取完成后(若配置了 FEISHU_CHAT_ID)自动推送日报到飞书.
-    node+dept 给定时爬单个类目(crawl_one), 否则跑全目录(main).
-    """
-    try:
-        if node and dept:
-            rp.crawl_one(node, dept, name or node, topk=topk)
-        else:
-            rp.main()
-    finally:
-        chat = os.environ.get("FEISHU_CHAT_ID")
-        open_id = os.environ.get("FEISHU_USER_OPEN_ID")
-        if chat or open_id:
-            try:
-                import feishu_report
-                res = feishu_report.run_report(chat, open_id)
-                print("日报推送结果:", res)
-            except Exception as e:
-                print("日报推送失败:", e)
+    """抓取单个类目(crawl_one 写本地缓存); 或跑全目录(main). 不推送飞书(项目A 已剥离飞书)."""
+    if node and dept:
+        rp.crawl_one(node, dept, name or node, topk=topk)
+    else:
+        rp.main()
 
 
 class Handler(BaseHTTPRequestHandler):

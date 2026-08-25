@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""数据聚合核心(被 serve.py 与飞书推送共用): 读飞书 Base -> 算概览/品牌/异常.
+"""数据聚合核心(被 serve.py 使用): 读本地缓存(data_cache/) -> 算概览/品牌/异常.
 
-纯数据层, 不依赖 HTTP 框架, 可独立 import.
+纯数据层, 不依赖 HTTP 框架, 可独立 import. 项目A 已剥离飞书, 竞品数据存本地缓存.
 """
 import requests
 import run_pipeline as rp
@@ -117,7 +117,7 @@ def build_query_payload(category=None, node=None):
     过滤后仅返回该类目数据, 供 Dify 按类目取竞品参考(多类目隔离)。
     不传则保持原行为: 返回 Base 全量。
     """
-    rows = feishu_read_all()
+    rows = rp.load_local_all()
 
     # 按类目过滤(仅当显式传了 category 或 node)
     if category and not node:

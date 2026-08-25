@@ -1,4 +1,9 @@
-.workbuddy/
+# 运行时本地缓存(竞品数据, 非源码)
+data_cache/
+
+# Python
 __pycache__/
 *.pyc
-*.zip
+
+# 凭证/环境变量
+.env
