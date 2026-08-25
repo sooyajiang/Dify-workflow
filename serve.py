@@ -15,6 +15,7 @@ import os
 import sys
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from urllib.parse import unquote
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import run_pipeline as rp
@@ -51,7 +52,7 @@ class Handler(BaseHTTPRequestHandler):
         path = self.path.split("?")[0]
         if path in ("/", ""):
             self._send(200, {"status": "ok", "msg": "竞品监控服务运行中",
-                             "tip": "POST /run 触发抓取(自动推日报); GET /report 手动推; GET /query 取数据"})
+                             "tip": "POST /run 触发抓取; GET /compete 一体化实时竞品; GET /query 调试用"})
             return
         if path in ("/query", "/query/"):
             if not _check_token(self.path):
@@ -61,8 +62,8 @@ class Handler(BaseHTTPRequestHandler):
             params = dict(x.split("=", 1) for x in q.split("&") if "=" in x)
             try:
                 self._send(200, qc.build_query_payload(
-                    category=params.get("category"),
-                    node=params.get("node")))
+                    category=unquote(params.get("category", "")) or None,
+                    node=unquote(params.get("node", "")) or None))
             except Exception as e:
                 self._send(500, {"error": str(e)})
             return
@@ -73,7 +74,7 @@ class Handler(BaseHTTPRequestHandler):
                 return
             q = self.path.split("?", 1)[1] if "?" in self.path else ""
             params = dict(x.split("=", 1) for x in q.split("&") if "=" in x)
-            category = params.get("category") or params.get("node")
+            category = unquote(params.get("category", "")) or unquote(params.get("node", ""))
             if not category:
                 self._send(400, {"error": "缺少 category 参数(自然语言类目名, 如 'girl kids bicycle')"})
                 return
