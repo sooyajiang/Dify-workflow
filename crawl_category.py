@@ -27,6 +27,7 @@ import json
 import os
 import re
 import sys
+from collections import Counter
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CATEGORY_DIR_PATH = os.environ.get(
@@ -115,8 +116,48 @@ def parse_search_node(html):
     return None
 
 
+# 亚马逊顶层 department node（超大根节点），搜索页左侧 facet 常包含它们，
+# 但不应作为“最相关类目”返回；否则竞品参考会太宽泛。
+_AMAZON_ROOT_NODES = {
+    "283155", "172282", "1055398", "3375251", "16310091",
+    "2335752011", "6669702011", "1084128", "51503011", "3760911",
+    "284507", "2617942011", "2972638011", "11971251", "133140011",
+    "3580501", "599872", "16310231", "12923371",
+}
+
+
+def _pick_search_node(html):
+    """从亚马逊搜索结果页左侧分类 facet 提取最相关类目 node.
+    策略: 优先取 rh=n%3A<node> 序列中最后出现的(通常最细粒度),
+          若落入超大根节点, 则改取频率最高且非超大根的 node."""
+    rh_nodes = re.findall(r'rh=n%3A(\d+)', html)
+    rh_nodes = [n for n in rh_nodes if len(n) >= 9]
+    if not rh_nodes:
+        return None
+    last = rh_nodes[-1]
+    if last not in _AMAZON_ROOT_NODES:
+        return last
+    freq = Counter(rh_nodes)
+    for node, _ in freq.most_common():
+        if node not in _AMAZON_ROOT_NODES:
+            return node
+    return None
+
+
+def _dept_from_url(url):
+    """从 Amazon Best Sellers / zgbs URL 提取 (dept_slug, node_id)."""
+    m = re.search(r"/zgbs/([\w-]+)/(\d{9,})", url)
+    if m:
+        return m.group(1), m.group(2)
+    m = re.search(r"/Best-Sellers(?:-[\w-]+)?/zgbs/([\w-]+)/(\d{9,})", url)
+    if m:
+        return m.group(1), m.group(2)
+    return None, None
+
+
 def resolve_from_search(query):
-    """自动搜亚马逊, 从搜索结果页解析 Best Sellers 节点(中等置信, 需联网).
+    """自动搜亚马逊, 从搜索结果页左侧 facet 解析真实类目节点(中等置信, 需联网).
+    再通过 gp/bestsellers/<node> 探测真实 dept, 交叉验证后返回.
     搜不到 / 被验证码拦截则返回 None, 交由上层 HITL. 绝不编造 node."""
     try:
         import requests
@@ -133,11 +174,25 @@ def resolve_from_search(query):
         r = sess.get(f"https://www.amazon.com/s?k={kw}", timeout=20)
         if r.status_code != 200:
             return None
+        # 兼容旧逻辑: 搜索页若直接出现 Best Sellers 链接, 优先用
         parsed = parse_search_node(r.text)
         if parsed:
             dept, node = parsed
             return {"node": node, "dept": dept, "name": query,
                     "conf": "medium", "src": "search", "ask": False}
+        # 新逻辑: 从左侧 facet 提取最相关 node, 再探测真实 dept
+        node = _pick_search_node(r.text)
+        if not node:
+            return None
+        br = sess.get(f"https://www.amazon.com/gp/bestsellers/{node}",
+                      timeout=20, allow_redirects=True)
+        if br.status_code != 200:
+            return None
+        dept, final_node = _dept_from_url(br.url)
+        if not dept or not final_node:
+            return None
+        return {"node": final_node, "dept": dept, "name": query,
+                "conf": "medium", "src": "search", "ask": False}
     except Exception:
         return None
     return None
