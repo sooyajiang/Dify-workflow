@@ -126,22 +126,19 @@ _AMAZON_ROOT_NODES = {
 }
 
 
-def _pick_search_node(html):
-    """从亚马逊搜索结果页左侧分类 facet 提取最相关类目 node.
-    策略: 优先取 rh=n%3A<node> 序列中最后出现的(通常最细粒度),
-          若落入超大根节点, 则改取频率最高且非超大根的 node."""
+def _pick_search_nodes(html, top_n=5):
+    """从亚马逊搜索结果页左侧分类 facet 提取候选类目 node 列表.
+    策略: 按出现频率+出现位置综合排序, 排除超大根节点和重复项.
+    返回 list[str], 优先试最细粒度/最相关的节点."""
     rh_nodes = re.findall(r'rh=n%3A(\d+)', html)
-    rh_nodes = [n for n in rh_nodes if len(n) >= 9]
+    rh_nodes = [n for n in rh_nodes if len(n) >= 9 and n not in _AMAZON_ROOT_NODES]
     if not rh_nodes:
-        return None
-    last = rh_nodes[-1]
-    if last not in _AMAZON_ROOT_NODES:
-        return last
+        return []
+    # 去重同时保留频率信息
     freq = Counter(rh_nodes)
-    for node, _ in freq.most_common():
-        if node not in _AMAZON_ROOT_NODES:
-            return node
-    return None
+    # 频率高 + 在列表中出现晚(更细)的优先
+    ordered = sorted(set(rh_nodes), key=lambda n: (-freq[n], rh_nodes[::-1].index(n)))
+    return ordered[:top_n]
 
 
 def _dept_from_url(url):
@@ -155,14 +152,48 @@ def _dept_from_url(url):
     return None, None
 
 
+def _probe_dept_node(sess, node, retries=2):
+    """通过构造 Best Sellers URL 并抓取页面, 从页面内 zgbs 链接反推真实 dept.
+    亚马逊对 dept slug 有容错: 即使占位 dept 不对, 也会返回真实 BSR 页面.
+    返回 (dept, node) 或 (None, None). 绝不编造.
+    带简单重试, 缓解 503/超时."""
+    import time
+    for attempt in range(retries + 1):
+        try:
+            # 占位 dept; 亚马逊会重定向/容错到真实类目, URL 可能不变但内容是真实 BSR
+            probe_url = f"https://www.amazon.com/Best-Sellers/zgbs/kitchen/{node}/"
+            br = sess.get(probe_url, timeout=20)
+            if br.status_code == 503 and attempt < retries:
+                time.sleep(1.5 * (attempt + 1))
+                continue
+            if br.status_code != 200:
+                return None, None
+            # 优先在页面内找当前 node 对应的 zgbs 链接 -> 真实 dept
+            m = re.search(rf"/zgbs/([\w-]+)/{node}/", br.text)
+            if m:
+                return m.group(1), node
+            # fallback: 解析页面内任意 BSR 链接
+            parsed = parse_search_node(br.text)
+            if parsed:
+                return parsed
+            return None, None
+        except Exception:
+            if attempt < retries:
+                time.sleep(1.5 * (attempt + 1))
+                continue
+            return None, None
+    return None, None
+
+
 def resolve_from_search(query):
     """自动搜亚马逊, 从搜索结果页左侧 facet 解析真实类目节点(中等置信, 需联网).
-    再通过 gp/bestsellers/<node> 探测真实 dept, 交叉验证后返回.
+    再通过 Best-Sellers/zgbs/<dept>/<node> 探测真实 dept, 交叉验证后返回.
     搜不到 / 被验证码拦截则返回 None, 交由上层 HITL. 绝不编造 node."""
     try:
         import requests
     except Exception:
         return None
+    import time
     try:
         sess = requests.Session()
         sess.headers.update({
@@ -171,8 +202,16 @@ def resolve_from_search(query):
             "Accept-Language": "en-US,en;q=0.9",
         })
         kw = requests.utils.quote(query)
-        r = sess.get(f"https://www.amazon.com/s?k={kw}", timeout=20)
-        if r.status_code != 200:
+        # 简单重试: 亚马逊偶发 503
+        r = None
+        for attempt in range(3):
+            r = sess.get(f"https://www.amazon.com/s?k={kw}", timeout=20)
+            if r.status_code == 200:
+                break
+            if r.status_code == 503 and attempt < 2:
+                time.sleep(1.5 * (attempt + 1))
+                continue
+        if not r or r.status_code != 200:
             return None
         # 兼容旧逻辑: 搜索页若直接出现 Best Sellers 链接, 优先用
         parsed = parse_search_node(r.text)
@@ -180,19 +219,14 @@ def resolve_from_search(query):
             dept, node = parsed
             return {"node": node, "dept": dept, "name": query,
                     "conf": "medium", "src": "search", "ask": False}
-        # 新逻辑: 从左侧 facet 提取最相关 node, 再探测真实 dept
-        node = _pick_search_node(r.text)
-        if not node:
-            return None
-        br = sess.get(f"https://www.amazon.com/gp/bestsellers/{node}",
-                      timeout=20, allow_redirects=True)
-        if br.status_code != 200:
-            return None
-        dept, final_node = _dept_from_url(br.url)
-        if not dept or not final_node:
-            return None
-        return {"node": final_node, "dept": dept, "name": query,
-                "conf": "medium", "src": "search", "ask": False}
+        # 新逻辑: 从左侧 facet 提取候选 node 列表, 逐个探测真实 dept
+        candidates = _pick_search_nodes(r.text)
+        for node in candidates:
+            dept, final_node = _probe_dept_node(sess, node)
+            if dept and final_node:
+                return {"node": final_node, "dept": dept, "name": query,
+                        "conf": "medium", "src": "search", "ask": False}
+        return None
     except Exception:
         return None
     return None
