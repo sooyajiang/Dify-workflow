@@ -141,6 +141,37 @@ def _pick_search_nodes(html, top_n=5):
     return ordered[:top_n]
 
 
+def _resolve_from_asin_detail(sess, query, max_asins=6):
+    """通过搜索结果 ASIN 详情页中的 BSR 类目路径反推真实 dept/node.
+    比 facet 更准, 因为详情页的类目路径直接对应商品."""
+    try:
+        kw = requests.utils.quote(query)
+        r = sess.get(f"https://www.amazon.com/s?k={kw}", timeout=20)
+        if r.status_code != 200:
+            return None, None
+        asins = re.findall(r'/dp/([A-Z0-9]{10})', r.text)
+        asins = list(dict.fromkeys(asins))[:max_asins]
+        if not asins:
+            return None, None
+        pair_counter = Counter()
+        for asin in asins:
+            d = sess.get(f"https://www.amazon.com/dp/{asin}", timeout=20)
+            if d.status_code != 200:
+                continue
+            # 取页面内所有 zgbs 链接, 过滤根节点
+            links = re.findall(r'/zgbs/([\w-]+)/(\d{9,})', d.text)
+            for dept, node in links:
+                if node not in _AMAZON_ROOT_NODES:
+                    pair_counter[(dept, node)] += 1
+        if not pair_counter:
+            return None, None
+        # 取出现频率最高的 (dept, node)
+        (dept, node), _ = pair_counter.most_common(1)[0]
+        return dept, node
+    except Exception:
+        return None, None
+
+
 def _dept_from_url(url):
     """从 Amazon Best Sellers / zgbs URL 提取 (dept_slug, node_id)."""
     m = re.search(r"/zgbs/([\w-]+)/(\d{9,})", url)
@@ -186,9 +217,10 @@ def _probe_dept_node(sess, node, retries=2):
 
 
 def resolve_from_search(query):
-    """自动搜亚马逊, 从搜索结果页左侧 facet 解析真实类目节点(中等置信, 需联网).
-    再通过 Best-Sellers/zgbs/<dept>/<node> 探测真实 dept, 交叉验证后返回.
-    搜不到 / 被验证码拦截则返回 None, 交由上层 HITL. 绝不编造 node."""
+    """自动搜亚马逊, 解析真实类目节点(中等置信, 需联网).
+    优先通过 ASIN 详情页 BSR 路径反推真实 dept/node(最准);
+    失败则 fallback 到 facet 候选探测. 搜不到 / 被验证码拦截返回 None.
+    绝不编造 node."""
     try:
         import requests
     except Exception:
@@ -219,10 +251,15 @@ def resolve_from_search(query):
             dept, node = parsed
             return {"node": node, "dept": dept, "name": query,
                     "conf": "medium", "src": "search", "ask": False}
-        # 新逻辑: 从左侧 facet 提取候选 node 列表, 逐个探测真实 dept
+        # 主逻辑: ASIN 详情页 BSR 路径反推(最准)
+        dept, node = _resolve_from_asin_detail(sess, query)
+        if dept and node:
+            return {"node": node, "dept": dept, "name": query,
+                    "conf": "medium", "src": "search", "ask": False}
+        # Fallback: 从左侧 facet 提取候选 node 列表, 逐个探测真实 dept
         candidates = _pick_search_nodes(r.text)
-        for node in candidates:
-            dept, final_node = _probe_dept_node(sess, node)
+        for cand in candidates:
+            dept, final_node = _probe_dept_node(sess, cand)
             if dept and final_node:
                 return {"node": final_node, "dept": dept, "name": query,
                         "conf": "medium", "src": "search", "ask": False}
