@@ -12,6 +12,7 @@ import re
 import time
 import random
 import datetime
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import requests
 from bs4 import BeautifulSoup
 
@@ -365,7 +366,7 @@ def crawl_one(node, dept, name, topk=50, scrape_date=None, dry_run=False):
         print(f"[dry-run] 将爬取 dept={dept} node={node} name={name} topk={topk}")
         return 0
     sd = scrape_date or datetime.date.today().isoformat()
-    rows = process_category(cat, sd)
+    rows = process_category(cat, sd, topk)
     if topk and topk < len(rows):
         rows = rows[:topk]
     if not rows:
@@ -383,7 +384,7 @@ def load_categories():
         return json.load(f)["categories"]
 
 
-def process_category(cat, scrape_date):
+def process_category(cat, scrape_date, topk=20):
     node = cat["node_id"]
     if not node or node == "TODO_VERIFY":
         print(f"  [跳过] {cat['key']} node_id 未核实")
@@ -396,10 +397,13 @@ def process_category(cat, scrape_date):
         return []
     items = parse_bsr(html)
     print(f"  榜单解析到 {len(items)} 个 ASIN")
-    rows = []
-    for it in items:
+    if topk and topk < len(items):
+        items = items[:topk]
+    node_id = cat["node_id"]
+
+    def _scrape(it):
         asin = it["asin"]
-        print(f"  [{it['rank']}/20] {asin} 抓取详情...")
+        print(f"  [{it['rank']}] {asin} 抓取详情...")
         d = extract_detail(fetch(f"{SITE}/dp/{asin}") or "")
         if not d.get("title"):
             d["title"] = it["title"]
@@ -407,15 +411,24 @@ def process_category(cat, scrape_date):
         d["asin"] = asin
         d["url"] = f"{SITE}/dp/{asin}"
         d["data_quality"] = ";".join(quality_flags(d))
-        # 长表一行
-        rows.append([
-            scrape_date, cat["node_id"], d["rank"], asin, d.get("brand", ""),
+        return [
+            scrape_date, node_id, d["rank"], asin, d.get("brand", ""),
             d.get("title", ""), d.get("price_usd", ""), d.get("rating", ""),
             d.get("review_count", ""), d.get("bsr_in_category", ""),
             "\n".join(d.get("bullets", [])), d.get("description", ""),
             d.get("url", ""), d.get("data_quality", ""),
-        ])
-        time.sleep(random.uniform(1.5, 4.0))
+        ]
+
+    rows = []
+    # 并发抓取详情(降低单类目总耗时, 让 /compete 同步现爬能在网关超时内返回)
+    with ThreadPoolExecutor(max_workers=3) as ex:
+        futs = [ex.submit(_scrape, it) for it in items]
+        for f in as_completed(futs):
+            try:
+                rows.append(f.result())
+            except Exception as e:
+                print(f"    详情抓取异常: {e}")
+    rows.sort(key=lambda r: r[2] if isinstance(r[2], int) else 999)
     return rows
 
 
