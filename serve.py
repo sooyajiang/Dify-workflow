@@ -105,22 +105,61 @@ class Handler(BaseHTTPRequestHandler):
                 payload["_source"] = "cache"
                 self._send(200, payload)
                 return
-            # 3) 缓存无数据 -> 同步现爬 -> 再查
+            # 3) 缓存无数据 -> 后台异步现爬, 立即返回 202(避免 Render 网关超时导致 502)
             try:
                 topk = int(params.get("topk", 10))
             except ValueError:
                 topk = 10
-            try:
-                _run_and_report(node=node, dept=dept, name=name, topk=topk)
-            except Exception as e:
-                self._send(500, {"error": f"抓取失败: {e}"})
+            threading.Thread(target=_run_and_report,
+                             kwargs={"node": node, "dept": dept, "name": name, "topk": topk},
+                             daemon=True).start()
+            self._send(202, {
+                "status": "crawling", "node": node, "dept": dept, "name": name,
+                "msg": "该类目缓存为空, 已后台启动抓取(约 15-60 秒). "
+                       "请稍后重试 /compete?category=... 即可命中缓存返回结构化竞品.",
+                "_source": "cold_start"})
+            return
+        if path in ("/warm", "/warm/"):
+            # 浏览器可触发的预热端点: 后台现爬指定类目, 立即 202(种本地缓存用)
+            if not _check_token(self.path):
+                self._send(403, {"error": "unauthorized"})
                 return
-            payload = qc.build_query_payload(node=node)
-            payload["_source"] = "fresh_crawl"
-            self._send(200, payload)
+            q = self.path.split("?", 1)[1] if "?" in self.path else ""
+            params = dict(x.split("=", 1) for x in q.split("&") if "=" in x)
+            category = unquote(params.get("category", "")) or unquote(params.get("node", ""))
+            if not category:
+                self._send(400, {"error": "缺少 category 参数(自然语言类目名)"})
+                return
+            import crawl_category as cc
+            try:
+                resolved = cc.resolve_category(category, cc.load_dir())
+            except Exception as e:
+                self._send(500, {"error": f"类目解析失败: {e}"})
+                return
+            if resolved.get("ask"):
+                self._send(400, {"error": "无法高置信解析该类目",
+                                 "hint": "请贴 Amazon BSR 链接或显式传 node/dept/name",
+                                 "detail": resolved})
+                return
+            node, dept, name = resolved["node"], resolved["dept"], resolved["name"]
+            try:
+                cc.save_seed(node, dept, name)
+            except Exception:
+                pass
+            try:
+                topk = int(params.get("topk", 10))
+            except ValueError:
+                topk = 10
+            threading.Thread(target=_run_and_report,
+                             kwargs={"node": node, "dept": dept, "name": name, "topk": topk},
+                             daemon=True).start()
+            self._send(202, {"status": "warming", "node": node, "dept": dept, "name": name,
+                             "msg": f"已后台启动抓取「{name}」(node={node}), 约 15-60 秒后 "
+                                    f"GET /compete?category={category}&token=... 即可命中缓存.",
+                             "_source": "cold_start"})
             return
         # /report 端点已移除: 项目A 已彻底剥离飞书, 不再推送飞书日报
-        # (取实时竞品请用 GET /compete?category=自然语言)
+        # (取实时竞品请用 GET /compete?category=自然语言; 预热用 GET /warm?category=自然语言)
         self._send(404, {"error": "not found"})
 
     def do_POST(self):
