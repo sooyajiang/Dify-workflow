@@ -302,29 +302,33 @@ def resolve_from_search(query):
         if not r or r.status_code != 200:
             debug.append("search failed -> HITL")
             return None, debug
-        # 主逻辑: ASIN 详情页 BSR 路径反推(最准), 先抓详情页再回搜页面, 避免搜索页顶部/推荐位污染
+        # 主逻辑: ASIN 详情页 BSR 路径反推(最准), 直接读真实商品的 Best Sellers Rank 类目, 不被搜索页污染
         dept, node, adbg = _resolve_from_asin_detail(sess, query)
         debug.extend(adbg)
         debug.append(f"asin_detail -> dept={dept} node={node}")
+        # 同时抓取搜索页左侧 facet(亚马逊官方给出的"相关类目"意图信号), 用于交叉确认/兜底
+        facet_nodes = _pick_search_nodes(r.text)
+        debug.append(f"facet candidates={facet_nodes}")
         if dept and node:
+            conf = "high" if node in facet_nodes else "medium"
+            if node in facet_nodes:
+                debug.append("cross-check: 商品 BSR 节点命中 facet 相关类目 -> 高置信")
             return {"node": node, "dept": dept, "name": query,
-                    "conf": "medium", "src": "search", "ask": False}, debug
-        # Fallback 1: 搜索页若直接出现真实 Best Sellers 链接(已过滤 unknown/polluter)
+                    "conf": conf, "src": "search", "ask": False}, debug
+        # Fallback 1: facet 候选(意图级, 更贴近查询本意), 逐个探测真实 dept
+        for cand in facet_nodes:
+            dept, final_node = _probe_dept_node(sess, cand)
+            debug.append(f"probe cand={cand} -> dept={dept} node={final_node}")
+            if dept and final_node:
+                return {"node": final_node, "dept": dept, "name": query,
+                        "conf": "medium", "src": "search", "ask": False}, debug
+        # Fallback 2: 搜索页面包屑 Best Sellers 链接(已过滤 unknown/polluter)
         parsed = parse_search_node(r.text)
         if parsed:
             dept, node = parsed
             debug.append(f"parse_search_node -> dept={dept} node={node}")
             return {"node": node, "dept": dept, "name": query,
                     "conf": "medium", "src": "search", "ask": False}, debug
-        # Fallback 2: 从左侧 facet 提取候选 node 列表, 逐个探测真实 dept
-        candidates = _pick_search_nodes(r.text)
-        debug.append(f"facet candidates={candidates}")
-        for cand in candidates:
-            dept, final_node = _probe_dept_node(sess, cand)
-            debug.append(f"probe cand={cand} -> dept={dept} node={final_node}")
-            if dept and final_node:
-                return {"node": final_node, "dept": dept, "name": query,
-                        "conf": "medium", "src": "search", "ask": False}, debug
         debug.append("no node resolved -> HITL")
         return None, debug
     except Exception as e:
