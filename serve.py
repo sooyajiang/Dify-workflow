@@ -110,9 +110,9 @@ class Handler(BaseHTTPRequestHandler):
                 return
             # 3) 缓存无数据 -> 同步现爬(已优化并发+降 topk, 目标 <25s) -> 直接返回结构化竞品
             try:
-                topk = int(params.get("topk", 8))
+                topk = int(params.get("topk", 6))
             except ValueError:
-                topk = 8
+                topk = 6
             try:
                 _run_and_report(node=node, dept=dept, name=name, topk=topk)
             except Exception as e:
