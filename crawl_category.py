@@ -29,6 +29,8 @@ import re
 import sys
 from collections import Counter
 
+import requests
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 CATEGORY_DIR_PATH = os.environ.get(
     "CATEGORY_DIR_PATH", os.path.join(HERE, "category_directory.json"))
@@ -44,7 +46,7 @@ def load_dir():
 
 def resolve_from_url(query):
     """从 Amazon BSR 链接提取真实 node + dept. 最可靠, 不靠猜."""
-    m = re.search(r"/zgbs/([\w-]+)/(\d{9,})", query)
+    m = re.search(r"/zgbs/([\w-]+)/(\d{7,})", query)
     if m:
         return {"node": m.group(2), "dept": m.group(1),
                 "name": "从URL解析", "conf": "high", "src": "url", "ask": False}
@@ -103,19 +105,27 @@ def parse_search_node(html):
     if "captcha" in low[:5000] or "robot check" in low[:5000]:
         return None
     # 来源1: 面包屑 Best Sellers 链接(最可靠, 含 dept+node; 有的带 zgbs 有的不带)
-    m = re.search(r"/Best-Sellers/([\w-]+)/(?:zgbs/)?(\d{9,})", html)
+    m = re.search(r"/Best-Sellers/([\w-]+)/(?:zgbs/)?(\d{7,})", html)
     if m:
-        return (m.group(1), m.group(2))
+        dept, node = m.group(1), m.group(2)
+        if dept != "unknown" and node not in _KNOWN_POLLUTER_NODES:
+            return (dept, node)
     # 来源2: 任意 zgbs 链接(dept+node)
-    m = re.search(r"/zgbs/([\w-]+)/(\d{9,})", html)
+    m = re.search(r"/zgbs/([\w-]+)/(\d{7,})", html)
     if m:
-        return (m.group(1), m.group(2))
+        dept, node = m.group(1), m.group(2)
+        if dept != "unknown" and node not in _KNOWN_POLLUTER_NODES:
+            return (dept, node)
     # 来源3: 带 node 的搜索/部门链接(中等可靠)
-    m = re.search(r"[?&]node=(\d{9,})", html)
+    m = re.search(r"[?&]node=(\d{7,})", html)
     if m:
         node = m.group(1)
+        if node in _KNOWN_POLLUTER_NODES:
+            return None
         dm = re.search(r"[?&]i=([\w-]+)", html)
-        return (dm.group(1) if dm else "unknown", node)
+        dept = dm.group(1) if dm else "unknown"
+        if dept != "unknown":
+            return (dept, node)
     return None
 
 
@@ -128,13 +138,18 @@ _AMAZON_ROOT_NODES = {
     "3580501", "599872", "16310231", "12923371",
 }
 
+# 搜索结果页常被误解析到的非相关节点（如礼品卡、Prime 会员等），需显式排除
+_KNOWN_POLLUTER_NODES = {
+    "2238192011",  # Gift Cards
+}
+
 
 def _pick_search_nodes(html, top_n=5):
     """从亚马逊搜索结果页左侧分类 facet 提取候选类目 node 列表.
     策略: 按出现频率+出现位置综合排序, 排除超大根节点和重复项.
     返回 list[str], 优先试最细粒度/最相关的节点."""
     rh_nodes = re.findall(r'rh=n%3A(\d+)', html)
-    rh_nodes = [n for n in rh_nodes if len(n) >= 9 and n not in _AMAZON_ROOT_NODES]
+    rh_nodes = [n for n in rh_nodes if len(n) >= 7 and n not in _AMAZON_ROOT_NODES]
     if not rh_nodes:
         return []
     # 去重同时保留频率信息
@@ -153,10 +168,10 @@ def _bsr_links_near_text(html, text_window=800):
     for pos in positions:
         snippet = html[max(0, pos - text_window):pos + text_window]
         # 提取 /gp/bestsellers/<dept>/<node> 和 /zgbs/<dept>/<node>
-        for dept, node in re.findall(r'/gp/bestsellers/([\w-]+)/(\d{9,})', snippet):
+        for dept, node in re.findall(r'/gp/bestsellers/([\w-]+)/(\d{7,})', snippet):
             if node not in _AMAZON_ROOT_NODES:
                 pairs.append((dept, node))
-        for dept, node in re.findall(r'/zgbs/([\w-]+)/(\d{9,})', snippet):
+        for dept, node in re.findall(r'/zgbs/([\w-]+)/(\d{7,})', snippet):
             if node not in _AMAZON_ROOT_NODES:
                 pairs.append((dept, node))
     return pairs
@@ -217,10 +232,10 @@ def _resolve_from_asin_detail(sess, query, max_asins=4):
 
 def _dept_from_url(url):
     """从 Amazon Best Sellers / zgbs URL 提取 (dept_slug, node_id)."""
-    m = re.search(r"/zgbs/([\w-]+)/(\d{9,})", url)
+    m = re.search(r"/zgbs/([\w-]+)/(\d{7,})", url)
     if m:
         return m.group(1), m.group(2)
-    m = re.search(r"/Best-Sellers(?:-[\w-]+)?/zgbs/([\w-]+)/(\d{9,})", url)
+    m = re.search(r"/Best-Sellers(?:-[\w-]+)?/zgbs/([\w-]+)/(\d{7,})", url)
     if m:
         return m.group(1), m.group(2)
     return None, None
@@ -265,10 +280,6 @@ def resolve_from_search(query):
     失败则 fallback 到 facet 候选探测. 搜不到 / 被验证码拦截返回 (None, debug).
     绝不编造 node. 收集 debug 供 /compete ?debug=1 透传到响应 JSON(不依赖日志)."""
     debug = []
-    try:
-        import requests
-    except Exception:
-        return None, debug
     import time
     try:
         sess = requests.Session()
@@ -291,21 +302,21 @@ def resolve_from_search(query):
         if not r or r.status_code != 200:
             debug.append("search failed -> HITL")
             return None, debug
-        # 兼容旧逻辑: 搜索页若直接出现 Best Sellers 链接, 优先用
-        parsed = parse_search_node(r.text)
-        if parsed:
-            dept, node = parsed
-            debug.append(f"parse_search_node -> dept={dept} node={node}")
-            return {"node": node, "dept": dept, "name": query,
-                    "conf": "medium", "src": "search", "ask": False}, debug
-        # 主逻辑: ASIN 详情页 BSR 路径反推(最准)
+        # 主逻辑: ASIN 详情页 BSR 路径反推(最准), 先抓详情页再回搜页面, 避免搜索页顶部/推荐位污染
         dept, node, adbg = _resolve_from_asin_detail(sess, query)
         debug.extend(adbg)
         debug.append(f"asin_detail -> dept={dept} node={node}")
         if dept and node:
             return {"node": node, "dept": dept, "name": query,
                     "conf": "medium", "src": "search", "ask": False}, debug
-        # Fallback: 从左侧 facet 提取候选 node 列表, 逐个探测真实 dept
+        # Fallback 1: 搜索页若直接出现真实 Best Sellers 链接(已过滤 unknown/polluter)
+        parsed = parse_search_node(r.text)
+        if parsed:
+            dept, node = parsed
+            debug.append(f"parse_search_node -> dept={dept} node={node}")
+            return {"node": node, "dept": dept, "name": query,
+                    "conf": "medium", "src": "search", "ask": False}, debug
+        # Fallback 2: 从左侧 facet 提取候选 node 列表, 逐个探测真实 dept
         candidates = _pick_search_nodes(r.text)
         debug.append(f"facet candidates={candidates}")
         for cand in candidates:
