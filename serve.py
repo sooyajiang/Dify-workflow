@@ -48,6 +48,18 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(json.dumps(obj, ensure_ascii=False).encode("utf-8"))
 
+    def do_HEAD(self):
+        """UptimeRobot 等探针默认发 HEAD; 根路径返回 200 空响应, 避免 501 误报."""
+        path = self.path.split("?")[0]
+        if path in ("/", ""):
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.end_headers()
+        else:
+            self.send_response(405)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.end_headers()
+
     def do_GET(self):
         path = self.path.split("?")[0]
         if path in ("/", ""):
