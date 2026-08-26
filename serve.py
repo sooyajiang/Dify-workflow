@@ -108,11 +108,11 @@ class Handler(BaseHTTPRequestHandler):
                     payload["_debug"] = resolved.get("_debug")
                 self._send(200, payload)
                 return
-            # 3) 缓存无数据 -> 同步现爬(已优化并发+降 topk, 目标 <25s) -> 直接返回结构化竞品
+            # 3) 缓存无数据 -> 同步现爬(已优化并发, 目标 <25s) -> 直接返回结构化竞品
             try:
-                topk = int(params.get("topk", 6))
+                topk = int(params.get("topk", 8))
             except ValueError:
-                topk = 6
+                topk = 8
             try:
                 _run_and_report(node=node, dept=dept, name=name, topk=topk)
             except Exception as e:
