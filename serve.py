@@ -88,7 +88,8 @@ class Handler(BaseHTTPRequestHandler):
             if resolved.get("ask"):
                 self._send(400, {"error": "无法高置信解析该类目",
                                  "hint": "请贴 Amazon BSR 链接或显式传 node/dept/name",
-                                 "detail": resolved})
+                                 "detail": resolved,
+                                 "debug": resolved.get("_debug")})
                 return
             node, dept, name = resolved["node"], resolved["dept"], resolved["name"]
             try:
@@ -103,6 +104,8 @@ class Handler(BaseHTTPRequestHandler):
                 return
             if payload.get("stats", {}).get("latest_count", 0) > 0:
                 payload["_source"] = "cache"
+                if params.get("debug"):
+                    payload["_debug"] = resolved.get("_debug")
                 self._send(200, payload)
                 return
             # 3) 缓存无数据 -> 同步现爬(已优化并发+降 topk, 目标 <25s) -> 直接返回结构化竞品
@@ -117,6 +120,8 @@ class Handler(BaseHTTPRequestHandler):
                 return
             payload = qc.build_query_payload(node=node)
             payload["_source"] = "fresh_crawl"
+            if params.get("debug"):
+                payload["_debug"] = resolved.get("_debug")
             self._send(200, payload)
             return
         if path in ("/warm", "/warm/"):

@@ -82,12 +82,15 @@ def resolve_category(query, cats):
     if r:
         return r
     # 中等置信: 自动搜亚马逊解析 BSR 节点(需联网, 失败则 HITL)
-    r = resolve_from_search(query)
+    r, dbg = resolve_from_search(query)
     if r:
+        r["_debug"] = dbg
         return r
     # 低置信度 -> 人工确认(HITL), 绝不编造 node
-    return {"node": None, "dept": None, "name": query,
+    hitl = {"node": None, "dept": None, "name": query,
             "conf": "low", "src": "hitl", "ask": True}
+    hitl["_debug"] = dbg
+    return hitl
 
 
 def parse_search_node(html):
@@ -162,49 +165,54 @@ def _bsr_links_near_text(html, text_window=800):
 def _resolve_from_asin_detail(sess, query, max_asins=4):
     """通过搜索结果 ASIN 详情页中的 'Best Sellers Rank' 链接反推真实 dept/node.
     只取 BSR 文本附近的链接, 避免详情页推荐位污染.
-    并发抓详情页, 控制总耗时在 Render 免费实例网关耐心内."""
+    并发抓详情页, 控制总耗时在 Render 免费实例网关耐心内.
+    返回 (dept, node, debug_list)."""
+    debug = []
     try:
         from concurrent.futures import ThreadPoolExecutor, as_completed
         kw = requests.utils.quote(query)
-        print(f"[resolve] search query={query}")
+        debug.append(f"asin_detail: search query={query}")
         r = sess.get(f"https://www.amazon.com/s?k={kw}", timeout=20)
-        print(f"[resolve] search status={r.status_code}")
+        debug.append(f"asin_detail: search status={r.status_code}")
         if r.status_code != 200:
-            return None, None
+            return None, None, debug
         asins = re.findall(r'/dp/([A-Z0-9]{10})', r.text)
         asins = list(dict.fromkeys(asins))[:max_asins]
-        print(f"[resolve] asins={asins}")
+        debug.append(f"asin_detail: asins={asins}")
         if not asins:
-            return None, None
+            return None, None, debug
 
         def fetch_one(asin):
+            d_debug = []
             try:
                 d = sess.get(f"https://www.amazon.com/dp/{asin}", timeout=15)
-                print(f"[resolve] detail {asin} status={d.status_code}")
+                d_debug.append(f"detail {asin} status={d.status_code}")
                 if d.status_code == 200:
                     links = _bsr_links_near_text(d.text)
-                    print(f"[resolve] detail {asin} bsr_links={links}")
-                    return links
+                    d_debug.append(f"detail {asin} bsr_links={links}")
+                    return links, d_debug
             except Exception as e:
-                print(f"[resolve] detail {asin} err={e}")
-            return []
+                d_debug.append(f"detail {asin} err={e}")
+            return [], d_debug
 
         pair_counter = Counter()
         with ThreadPoolExecutor(max_workers=3) as exe:
             futures = [exe.submit(fetch_one, asin) for asin in asins]
             for fut in as_completed(futures):
-                for dept, node in fut.result():
+                links, d_debug = fut.result()
+                debug.extend(d_debug)
+                for dept, node in links:
                     pair_counter[(dept, node)] += 1
-        print(f"[resolve] pair_counter={dict(pair_counter)}")
+        debug.append(f"asin_detail: pair_counter={dict(pair_counter)}")
         if not pair_counter:
-            return None, None
+            return None, None, debug
         # 取出现频率最高的 (dept, node)
         (dept, node), cnt = pair_counter.most_common(1)[0]
-        print(f"[resolve] picked dept={dept} node={node} cnt={cnt}")
-        return dept, node
+        debug.append(f"asin_detail: picked dept={dept} node={node} cnt={cnt}")
+        return dept, node, debug
     except Exception as e:
-        print(f"[resolve] exception {e}")
-        return None, None
+        debug.append(f"asin_detail: exception {e}")
+        return None, None, debug
 
 
 def _dept_from_url(url):
@@ -254,12 +262,13 @@ def _probe_dept_node(sess, node, retries=2):
 def resolve_from_search(query):
     """自动搜亚马逊, 解析真实类目节点(中等置信, 需联网).
     优先通过 ASIN 详情页 BSR 路径反推真实 dept/node(最准);
-    失败则 fallback 到 facet 候选探测. 搜不到 / 被验证码拦截返回 None.
-    绝不编造 node."""
+    失败则 fallback 到 facet 候选探测. 搜不到 / 被验证码拦截返回 (None, debug).
+    绝不编造 node. 收集 debug 供 /compete ?debug=1 透传到响应 JSON(不依赖日志)."""
+    debug = []
     try:
         import requests
     except Exception:
-        return None
+        return None, debug
     import time
     try:
         sess = requests.Session()
@@ -273,39 +282,44 @@ def resolve_from_search(query):
         r = None
         for attempt in range(3):
             r = sess.get(f"https://www.amazon.com/s?k={kw}", timeout=20)
+            debug.append(f"search attempt={attempt} status={r.status_code}")
             if r.status_code == 200:
                 break
             if r.status_code == 503 and attempt < 2:
                 time.sleep(1.5 * (attempt + 1))
                 continue
         if not r or r.status_code != 200:
-            return None
+            debug.append("search failed -> HITL")
+            return None, debug
         # 兼容旧逻辑: 搜索页若直接出现 Best Sellers 链接, 优先用
         parsed = parse_search_node(r.text)
         if parsed:
             dept, node = parsed
+            debug.append(f"parse_search_node -> dept={dept} node={node}")
             return {"node": node, "dept": dept, "name": query,
-                    "conf": "medium", "src": "search", "ask": False}
+                    "conf": "medium", "src": "search", "ask": False}, debug
         # 主逻辑: ASIN 详情页 BSR 路径反推(最准)
-        dept, node = _resolve_from_asin_detail(sess, query)
-        print(f"[resolve] asin_detail dept={dept} node={node}")
+        dept, node, adbg = _resolve_from_asin_detail(sess, query)
+        debug.extend(adbg)
+        debug.append(f"asin_detail -> dept={dept} node={node}")
         if dept and node:
             return {"node": node, "dept": dept, "name": query,
-                    "conf": "medium", "src": "search", "ask": False}
+                    "conf": "medium", "src": "search", "ask": False}, debug
         # Fallback: 从左侧 facet 提取候选 node 列表, 逐个探测真实 dept
         candidates = _pick_search_nodes(r.text)
-        print(f"[resolve] facet candidates={candidates}")
+        debug.append(f"facet candidates={candidates}")
         for cand in candidates:
             dept, final_node = _probe_dept_node(sess, cand)
-            print(f"[resolve] probe cand={cand} -> dept={dept} node={final_node}")
+            debug.append(f"probe cand={cand} -> dept={dept} node={final_node}")
             if dept and final_node:
                 return {"node": final_node, "dept": dept, "name": query,
-                        "conf": "medium", "src": "search", "ask": False}
-        print("[resolve] no node resolved, hitl")
-        return None
-    except Exception:
-        return None
-    return None
+                        "conf": "medium", "src": "search", "ask": False}, debug
+        debug.append("no node resolved -> HITL")
+        return None, debug
+    except Exception as e:
+        debug.append(f"exception {e}")
+        return None, debug
+    return None, debug
 
 
 def save_seed(node, dept, name):
