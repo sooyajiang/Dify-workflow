@@ -143,6 +143,27 @@ _KNOWN_POLLUTER_NODES = {
     "2238192011",  # Gift Cards
 }
 
+# 模拟真实浏览器的请求头: 亚马逊对"只带 UA"的精简头会 503 反爬,
+# 详情页 /dp/<asin> 尤甚; 补全 sec-ch-ua / Accept / Sec-Fetch-* 后详情页可正常 200,
+# 从而能从商品 Best Sellers Rank 精准反推真实类目(否则整条解析崩 -> HITL -> /compete 400).
+_BROWSER_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                  "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,"
+              "image/avif,image/webp,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Connection": "keep-alive",
+    "Upgrade-Insecure-Requests": "1",
+    "Sec-Fetch-Dest": "document",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-Site": "none",
+    "Sec-Fetch-User": "?1",
+    "sec-ch-ua": '"Chromium";v="120", "Google Chrome";v="120", "Not?A_Brand";v="24"',
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-platform": '"Windows"',
+}
+
 
 def _pick_search_nodes(html, top_n=5):
     """从亚马逊搜索结果页左侧分类 facet 提取候选类目 node 列表.
@@ -157,6 +178,19 @@ def _pick_search_nodes(html, top_n=5):
     # 频率高 + 在列表中出现晚(更细)的优先
     ordered = sorted(set(rh_nodes), key=lambda n: (-freq[n], rh_nodes[::-1].index(n)))
     return ordered[:top_n]
+
+
+def _collect_node_candidates(html, top_n=8):
+    """从搜索结果页所有 `node=<id>` 链接提取候选类目(左侧导航/面包屑/相关类目).
+    过滤亚马逊顶层根节点与已知污染节点, 按出现频率排序.
+    作为详情页 BSR 反推失败(偶发 503 反爬)时的兜底: 取最频繁候选 -> _probe_dept_node 探测真实 dept."""
+    nodes = re.findall(r'[?&]node=(\d{7,})', html)
+    nodes = [n for n in nodes if n not in _AMAZON_ROOT_NODES
+             and n not in _KNOWN_POLLUTER_NODES]
+    if not nodes:
+        return []
+    freq = Counter(nodes)
+    return [n for n, _ in freq.most_common(top_n)]
 
 
 def _bsr_links_near_text(html, text_window=800):
@@ -283,11 +317,7 @@ def resolve_from_search(query):
     import time
     try:
         sess = requests.Session()
-        sess.headers.update({
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                          "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
-            "Accept-Language": "en-US,en;q=0.9",
-        })
+        sess.headers.update(_BROWSER_HEADERS)
         kw = requests.utils.quote(query)
         # 简单重试: 亚马逊偶发 503
         r = None
@@ -315,6 +345,15 @@ def resolve_from_search(query):
                 debug.append("cross-check: 商品 BSR 节点命中 facet 相关类目 -> 高置信")
             return {"node": node, "dept": dept, "name": query,
                     "conf": conf, "src": "search", "ask": False}, debug
+        # Fallback 1.5: 搜索页 node= 链接候选(不依赖详情页 BSR, 反爬兜底), 多数票 + 探测真实 dept
+        cand_nodes = _collect_node_candidates(r.text)
+        debug.append(f"search node candidates={cand_nodes}")
+        for cand in cand_nodes:
+            dept2, final_node = _probe_dept_node(sess, cand)
+            debug.append(f"probe cand={cand} -> dept={dept2} node={final_node}")
+            if dept2 and final_node:
+                return {"node": final_node, "dept": dept2, "name": query,
+                        "conf": "low", "src": "search", "ask": False}, debug
         # Fallback 1: facet 候选(意图级, 更贴近查询本意), 逐个探测真实 dept
         for cand in facet_nodes:
             dept, final_node = _probe_dept_node(sess, cand)
