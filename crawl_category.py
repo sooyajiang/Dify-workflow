@@ -61,6 +61,21 @@ def _tokens(s):
 def resolve_from_directory(query, cats):
     q_tokens = _tokens(query)
     if not q_tokens:
+        # 纯中文/无字母数字(如"不锈钢保温水杯"): 退化为子串包含匹配.
+        # 目的: /compete 首次解析后 save_seed 会把中文类目固化进目录,
+        # 二次请求直接 high 命中 -> 跳过 resolve_from_search 现搜亚马逊反爬(省 15-25s),
+        # 且 node 固定不再漂移 -> 数据缓存(data_cache/<node>.json)稳定可命中.
+        q_norm = re.sub(r"\s+", "", query.lower())
+        if not q_norm:
+            return None
+        for c in cats:
+            blob = re.sub(r"\s+", "", " ".join([
+                c.get("key", ""), c.get("display_name", ""),
+                " ".join(c.get("seed_keywords", []))]).lower())
+            if q_norm in blob:
+                return {"node": c["node_id"], "dept": c["dept"],
+                        "name": c["display_name"], "conf": "high",
+                        "src": "directory", "ask": False}
         return None
     for c in cats:
         blob = " ".join([c.get("key", ""), c.get("display_name", ""),

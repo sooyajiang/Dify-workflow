@@ -201,7 +201,7 @@ def fetch(url, retries=3):
                 return r.text
         except Exception as e:
             print(f"    重试{i+1}: {e}")
-        time.sleep(3 + random.random() * 2)
+        time.sleep(1 + random.random() * 1)
     return None
 
 
