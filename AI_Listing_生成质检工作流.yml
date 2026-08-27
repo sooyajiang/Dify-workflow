@@ -1,6 +1,5 @@
 app:
-  description: 基于亚马逊2026年7月新规的 AI Listing 生成与质检工作流。支持自然语言输入，按需生成标题/五点/Item Highlights/后台词，双
-    LLM 质检 + 自动重生成闭环，确保标题≤75字符且合规可发布。
+  description: 基于亚马逊2026年7月新规的 AI Listing 生成与质检工作流。支持自然语言输入，按需生成标题/五点/Item Highlights/后台词，双 LLM 质检 + 自动重生成闭环，确保标题≤75字符且合规可发布。
   icon: purple_heart
   icon_background: '#FBE8FF'
   icon_type: emoji
@@ -59,7 +58,7 @@ workflow:
       number_limits: 3
     opening_statement: ''
     retriever_resource:
-      enabled: true
+      enabled: false
     sensitive_word_avoidance:
       enabled: false
     speech_to_text:
@@ -232,25 +231,11 @@ workflow:
     - data:
         isInIteration: false
         isInLoop: false
-        sourceType: llm
+        sourceType: if-else
         targetType: llm
-      id: 17869604597020-source-17869605346100-target
-      selected: false
-      source: '17869604597020'
-      sourceHandle: source
-      target: '17869605346100'
-      targetHandle: target
-      type: custom
-      zIndex: 0
-    - data:
-        isInIteration: false
-        isInLoop: false
-        sourceType: llm
-        targetType: code
-      id: 17869605346100-source-1786958804357-target
-      selected: false
-      source: '17869605346100'
-      sourceHandle: source
+      id: 17869597947390-false-17869604597020-target
+      source: '17869597947390'
+      sourceHandle: 'false'
       target: '1786958804357'
       targetHandle: target
       type: custom
@@ -258,12 +243,37 @@ workflow:
     - data:
         isInIteration: false
         isInLoop: false
-        sourceType: if-else
+        sourceType: start
+        targetType: http-request
+      id: 1785988347843-source-2000000000001-target
+      selected: false
+      source: '1785988347843'
+      sourceHandle: source
+      target: '2000000000001'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: http-request
+        targetType: code
+      id: 2000000000002-e2
+      source: '2000000000001'
+      sourceHandle: source
+      target: '2000000000002'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: code
         targetType: llm
-      id: 17869597947390-false-17869604597020-target
-      source: '17869597947390'
-      sourceHandle: 'false'
-      target: '17869604597020'
+      id: 2000000000002-e3
+      source: '2000000000002'
+      sourceHandle: source
+      target: llm
       targetHandle: target
       type: custom
       zIndex: 0
@@ -293,6 +303,17 @@ workflow:
           variable_selector:
           - '1786608707687'
           - result
+        memory:
+          query_prompt_template: '{{#sys.query#}}
+
+
+            {{#sys.files#}}'
+          role_prefix:
+            assistant: ''
+            user: ''
+          window:
+            enabled: true
+            size: 20
         model:
           completion_params:
             temperature: 0.7
@@ -302,22 +323,7 @@ workflow:
         prompt_template:
         - id: 0e3acd22-7996-4a96-b86d-92b1321d341a
           role: system
-          text: "你是一名亚马逊Listing专家。请按以下步骤执行：\n\n第1步 意图解析\n读取用户的自然语言输入 {{#sys.query#}}，判断用户想生成哪些部分。\n\
-            可选部分：title(标题)、highlights(Item Highlights)、bullets(五点描述)、backend(后台搜索词)。\n\
-            将结果输出为 requested_parts 数组，例如 [\"title\"] 或 [\"title\",\"bullets\"]。\n\
-            如果用户未指定，默认输出 [\"title\",\"highlights\",\"bullets\",\"backend\"]。\n\n第2步\
-            \ 规则参考\n使用以下检索结果作为亚马逊平台规则参考，请严格遵守：\n{{#context#}}\n\n第3步 按需生成\n仅生成 requested_parts\
-            \ 中包含的部分，未要求的部分不要输出。\n标题必须 ≤75 字符（含空格）。生成后自查字符数，超出必须精简到 75 以内再输出，并如实填入\
-            \ title_length 与 title_compliant。。\n\n输出必须是纯JSON，不要添加任何注释或代码围栏：\n{\n \
-            \ \"requested_parts\": [\"title\",\"highlights\",\"bullets\",\"backend\"\
-            ],\n  \"title\": \"Adjustable 16 Inch Kids Bicycle with Training Wheels\"\
-            ,\n  \"title_length\": 47,\n  \"title_compliant\": true,\n  \"highlights\"\
-            : [\"Adjustable Seat\", \"Training Wheels Included\", \"Sturdy Steel Frame\"\
-            ],\n  \"bullets\": [\"Designed for kids aged 4-7\", \"Includes removable\
-            \ training wheels\", \"Lightweight steel frame\", \"Durable design\",\
-            \ \"Easy assembly\"],\n  \"backend\": [\"kids bicycle\", \"training wheels\
-            \ bike\", \"adjustable seat bike\", \"16 inch kids bike\"],\n  \"reason\"\
-            : \"说明生成依据\"\n}"
+          text: "你是一名资深亚马逊跨境电商 Listing 专家，精通 2026 年 7 月新规与 COSMO / A9 算法。\n\n# 通用规则参考（来自知识库）\n{{#context#}}\n\n# 竞品参考（来自实时 BSR，/compete 接口）\n{{#2000000000002.comp_context#}}\n\n# 用户输入（自然语言）\n{{#sys.query#}}\n\n# 任务\n用户用自然语言描述了一款产品（可能口语化、信息不全、顺序混乱），并可能只要求生成其中某一部分。请按以下步骤：\n\n**第 1 步｜意图解析（部分生成 or 全量）**\n- 判断用户想要哪些部分：title / highlights / bullets / backend。\n- 点名某部分 → requested_parts 只含这些；未指定 → 全量四项。\n- 用户给了现有内容 → 基于它优化而非从零；没给则从零生成。\n\n**第 2 步｜提取关键信息**\n提取产品类型 / 尺寸 / 适龄人群 / 材质 / 核心卖点 / 目标市场 / 语种等。\n\n**第 2.5 步｜事实依据门禁（防编造，优先于生成）**\n- 把内容分成两类：硬事实（材质 / 尺寸 / 规格 / 认证 / 数量，必须溯源）与软卖点（人群 / 场景 / 定性利益）。\n- 硬事实只能来自：① 用户输入 ② 类目共识（仅作通用措辞，不得伪称本商品专属参数）。二者皆无 → 该硬事实不写，改用软卖点，并记录到 needs_clarification。\n- 有需求才建议补全数据：仅当缺失的硬事实属于本类目关键决策属性（如车架材质 / 轮径 / 辅助轮），或用户点名但未给值时，才在 data_suggestions 给出\"补全真实数据\"建议；非关键属性缺失则安静省略，不触发建议。\n- 软卖点可自由使用，但不得伪装成可量化参数。绝不虚构任何材质 / 尺寸 / 认证来凑满字段。\n- 缺失硬事实输出标注（通用格式）：凡因\"二类皆无\"而未写的硬事实（品牌 / 材质 / 尺寸 / 规格 / 认证 / 数量 / 兼容平台 / 连接方式 / 适龄），在对应字段用 [待补XX] 占位（如标题 [待补品牌名]、Highlights 内 [待补材质]、Bullets 内 [待补兼容平台]），并全部记入 needs_clarification；禁止用 BrandName / Generic 等模糊词糊弄。\n\n**第 3 步｜定向生成（严格遵守 2026 新规，并追求\"丰满、专业、有画面感\"）**\n\n【整体文案风格】\n- 即使硬事实缺失，也要基于\"竞品 + 类目共识 + 用户意图\"写出**完整、专业、有画面感**的文案骨架；软卖点与场景描写可自由丰满，硬事实处才用 [待补XX] 占位。\n- Bullet 采用【模块式小标题】写法：每条以加粗短标签（如 【Grows with Your Child】/【Safety First】/【Easy to Ride】）起头，再展开\"场景/痛点 → 解决方案 → 用户获得利益\"的完整句式，语言地道、有细节、像资深运营手笔，杜绝干瘪罗列。\n- 多用用户视角（家长/孩子）与具体情境（公园、生日礼物、黄昏骑行），提升可信度与转化感。\n\n【标题 title，≤75 字符】结构：[品牌名]+[核心品类词]+[1个最强差异化属性]；品牌名前置；前30字符放核心流量大词；禁止堆砌>3场景词、禁止虚词；核心词留标题。\n- 品牌名取值铁律（严禁写 BrandName / Generic / YourBrand 等无意义占位词）：① 用户已给真实品牌 → 直接用；② 竞品 brands 列表存在清晰头部品牌（如 Xbox / PlayStation / Owala）→ 可借用其命名风格作示例，但标题品牌位必须写 [待补品牌名] 明确告知需替换，不得伪称本商品即该品牌；③ 二者皆无 → 标题品牌位写 [待补品牌名]，并在 needs_clarification 记入 brand。\n\n【Item Highlights，≤125字符，属性标签非句子】短句词条逗号分隔，覆盖材质+场景+功能+规格；在类目共识范围内尽量具体（如\"Adjustable Height\"），真实硬事实缺失才用 [待补材质] 等占位。\n\n【Bullet Points，4-5条，适配COSMO】每条【小标题】+[场景/痛点]+[如何解决]+[获得利益]，可加1句情境/细节描写使文案丰满；前1-2条嵌入核心关键词；单条≤150字符，禁 ALL CAPS。参考句式：【Safety First】Equipped with removable training wheels and a fully enclosed chain guard, keeping little fingers safe while your child builds confidence on every ride.\n\n【Backend Search Terms，≤249字节】同义/长尾变体，不重复前两层。\n\n- requested_parts 之外的字段返回空字符串/空数组。\n\n**第 4 步｜标题长度自检（强制）**\n生成 title 后数字符数（含空格标点）。>75 必须回缩（删修饰词、合并场景词），保留\"品牌前置+前30字符含核心词\"。回填 title_length，title_compliant 填 true。\n\n# 输出（严格只输出 JSON，不要额外文字、不要markdown围栏）\n{\n  \"requested_parts\": [\"title\", \"highlights\", \"bullets\", \"backend\"],\n  \"title\": \"≤75字符标题\",\n  \"title_length\": 数字,\n  \"title_compliant\": true,\n  \"highlights\": [\"标签1\", \"标签2\"],\n  \"bullets\": [\"4-5条场景化五点\"],\n  \"backend\": [\"长尾补充词\"],\n  \"category\": \"类目\",\n  \"language\": \"en/zh/ja\",\n  \"needs_clarification\": [\"未提供的硬事实如wheel_size\"],\n  \"data_suggestions\": [\"关键属性缺失建议提供真实参数\"]\n}\n"
         selected: false
         structured_output_enabled: false
         title: LLM A
@@ -340,8 +346,10 @@ workflow:
       zIndex: 0
     - data:
         context:
-          enabled: false
-          variable_selector: []
+          enabled: true
+          variable_selector:
+          - '1786608707687'
+          - result
         model:
           completion_params:
             temperature: 0.7
@@ -354,16 +362,7 @@ workflow:
         - edition_type: basic
           id: f426b748-d160-45d6-b611-6f3508560084
           role: system
-          text: "你是一名亚马逊Listing质检专家。请根据用户需求和亚马逊平台规则，对生成内容做质量评估。\n\n第1步 读取内容\n- 用户的原始自然语言需求：{{#sys.query#}}\n\
-            - 待质检的生成内容（JSON）：{{#llm.text#}}\n- 亚马逊平台规则参考：{{#context#}}\n\n第2步 确定评估范围\n\
-            仅评估 requested_parts 中明确要求的字段。用户未要求生成的字段（如未要 highlights 或 backend），即使为空也不判违规、不扣分。\n\
-            \n第3步 八维度评分（仅针对已生成字段）\n对每个已生成字段从以下维度打分（1-10）：\n关键词相关性、卖点吸引力、语法可读性、平台合规性（标题≤75字符、无禁用词）、COSMO/A9覆盖、2026新规合规（标题≤75、Item\
-            \ Highlights属性标签结构）、Alexa优化、多语言本地化。\n综合得分 = 八维平均分；≥8分为通过。\n\n第4步 输出\n\
-            输出纯JSON，不要代码围栏：\n{\n  \"score\": 8.5,\n  \"passed\": true,\n  \"hard_violation\"\
-            : false,\n  \"dimensions\": {\"关键词相关性\": 9, \"卖点吸引力\": 8, \"语法可读性\": 9,\
-            \ \"平台合规性\": 8, \"COSMO/A9覆盖\": 8, \"2026新规合规\": 8, \"Alexa优化\": 8, \"\
-            多语言本地化\": 8},\n  \"issues\": [],\n  \"suggestions\": [\"如有问题列出，无则空数组\"\
-            ]\n}"
+          text: '你是一名严格的亚马逊 Listing 合规质检员。依据 Amazon Listing 四大底层算法（CDQ / A9 / COSMO            \ / Alexa）与 2026 年 7 月新规，对 Listing 做全身体检并输出结构化诊断报告。\n\n# 质检规则与红线（来自知识库）\n            {{#context#}}\n\n# 待质检的 Listing（生成节点输出）\n{{#llm.text#}}\n\n# 第一步｜四柱评分（每项            \ 0-10，先估各柱再加权得综合分）\n## 四柱综合权重：CDQ 40% / A9 25% / COSMO 25% / Alexa 10%（CDQ            \ 为命门，权重最高）\n## 各柱打分锚点（必须按实际表现判定，严禁照搬示例数字）：\n\n【CDQ 内容质量分 0-10】由以下子项加权（采用            \ Listing Doctor 占比体系）：\n- 结构化属性 30%：标题/Highlights/Bullets/Backend 中硬事实（材质/尺寸/适龄/场景）填充完整度\n            - 标题 25%：≤75字符、品牌前置、前30字符核心词；>75字符 → CDQ 直接 0 分\n- 变体 20%：变体关系/信息完整性（无变体数据则\"            缺数据降级\"，按现有信息给分但不满分）\n- 图片 15%：主图/辅图质量（本 workflow 未生成图片 → 标 N/A 不计入，其余子项归一化）\n            - 五点描述 5%：Bullet Points 质量\n- A+ 页面 5%：品牌故事/图文（本 workflow 未生成 → 标 N/A            \ 不计入，其余子项归一化）\nCDQ 锚点：9-10 结构化属性齐全+标题完美；7-8 基本完整个别软兜底；5-6 多项硬事实缺失；≤4            \ 标题严重违规。\n\n【A9 收录健康度 0-10】核心词是否标题最前；Search Terms 清洁度（无冗余堆砌）；属性填充完整度。\n            锚点：9-10 核心词最前+Search Terms 清洁+属性全；7-8 核心词尚可少量冗余；5-6 核心词偏后/有堆砌；≤4 核心词缺失/大量堆砌。\n            \n【COSMO 意图覆盖度 0-10】Use Case（场景）/ Audience（人群）/ Goal（目标）/ Constraint（约束）四维度覆盖。\n            锚点：9-10 四维度全覆盖且自然；7-8 覆盖3维；5-6 覆盖2维；≤4 基本无场景人群表达。\n\n【Alexa 可发现性 0-10】能否被对话式购物助手推荐（Listing            \ 是否\"说人话\"、可被自然语言问答命中）。\n锚点：9-10 说人话可被\"适合X岁的Y推荐\"类提问命中；7-8 基本可读部分需推断；5-6            \ 偏参数堆砌；≤4 纯堆砌无法被推荐。\n\n# 第二步｜合规体检（逐项，命中即 P0 违规）\n标题 ≤75字符/品牌前置/前30字符核心词/禁堆砌>3场景词/禁虚词；\n            Item Highlights ≤125字符且为标签非句子；\nSearch Terms 清洁无堆砌；\n营销禁词。\n\n# 第三步｜改进行动清单（按优先级）\n            - P0 紧急（违规/硬门槛）：标题超长、品牌未前置、前30字符无核心词、Highlights写句子、五点前1-2条缺核心关键词、单条>150、ALL            \ CAPS、营销禁词。\n- P1 重要（显著拉分）：COSMO 某维度缺失、A9 核心词位置偏后、结构化属性未填。\n- P2 优化（锦上添花）：Alexa            \ 话术。\n\n# passed 判定口径（严格）\n- 命中任一 P0 违规 → passed=false\n- 无 P0 且 综合分            \ ≥ 8.5 → passed=true\n- 综合分 score = CDQ×0.4 + A9×0.25 + COSMO×0.25 +            \ Alexa×0.1，四舍五入保留一位小数。\n- dimensions 中 4 个维度必须由你根据实际表现逐项判定 0-10 分，严禁照搬示例数字。\n            \n# suggestions 规则（严格执行）\n- suggestions 包含两类：\n  ① 文本修改动作（如\"将[Brand]替换为真实品牌名并复检≤75字符\"            ）\n  ② 信息请求：找出得分最低的 1-2 个柱子，针对该柱子缺失的真实硬事实，向用户提出补全请求，格式：\n     【待你提供·{柱名}】{柱名}得分            \ X，请补充：{该维度缺失的关键信息，如材质/轮径/适龄/场景}\n  凡需用户/商家补充的真实数据，一律以\"【待你提供】\"格式写进            \ suggestions，不得伪称已获取。\n- passed=true 且无实质问题时 suggestions 必须为 []、issues            \ 为\"无明显问题\"。\n\n# 输出（严格只输出 JSON，不要额外文字、不要 markdown 围栏）\n{\n  \"score\"            : 数字(0-10),\n  \"dimensions\": {\"CDQ\": 数字, \"A9\": 数字, \"COSMO\": 数字,            \ \"Alexa\": 数字},\n  \"passed\": true或false,\n  \"hard_violation\": false,\n            \  \"issues\": [\"问题1\", \"问题2\"],\n  \"suggestions\": [\"①文本修改动作\", \"            ②【待你提供·CDQ】CDQ得分6，请补充：车架材质、轮径、适龄范围\"],\n  \"action_list\": {\"P0\": [\"            ...\"], \"P1\": [\"...\"], \"P2\": [...]}\n}"'
         selected: false
         title: LLM B
         type: llm
@@ -405,8 +404,7 @@ workflow:
       zIndex: 0
     - data:
         dataset_ids:
-        - vzqy/U1rmPdsjpS32hLhTNHU7lwKhsZw3uFIq8tHyXomO9iVMfqg7kuWuy8AsAWK
-        - 9DIMwnalMHFhp/0tznmK/oLZx8pHw8Sxlf01p1cos0XYj0y+cpDxFbbhPNjpGmXK
+        - nS+CorM02QoLqXqINhLA+8OMg4Kp4qh/utNQl/uwLKDoARqRtUKWWR+v5Ogi2tbl
         multiple_retrieval_config:
           reranking_enable: false
           reranking_mode: weighted_score
@@ -416,7 +414,7 @@ workflow:
             keyword_setting:
               keyword_weight: 0.3
             vector_setting:
-              embedding_model_name: embedding-3
+              embedding_model_name: text_embedding
               embedding_provider_name: langgenius/zhipuai/zhipuai
               vector_weight: 0.7
             weight_type: customized
@@ -428,7 +426,7 @@ workflow:
         selected: false
         title: 知识检索
         type: knowledge-retrieval
-      height: 118
+      height: 90
       id: '1786608707687'
       position:
         x: 127.63785872545361
@@ -443,20 +441,7 @@ workflow:
       width: 242
       zIndex: 0
     - data:
-        code: "import json, re\ndef clean(t):\n    t = re.sub(r'<think>.*?</think>',\
-          \ '', t or '', flags=re.DOTALL)\n    t = re.sub(r'```json\\s*', '', t or\
-          \ '', flags=re.IGNORECASE)\n    t = re.sub(r'\\s*```', '', t or '')\n  \
-          \  s, e = (t or '').find('{'), (t or '').rfind('}')\n    if s != -1 and\
-          \ e > s:\n        t = t[s:e+1]\n    return t\ndef main(qa: str) -> dict:\n\
-          \    try:\n        d = json.loads(clean(qa))\n    except Exception:\n  \
-          \      d = {}\n    passed = d.get('passed', False)\n    if isinstance(passed,\
-          \ str):\n        passed = passed.lower() == 'true'\n    try:\n        score\
-          \ = float(d.get('score', 0))\n    except Exception:\n        score = 0\n\
-          \    issues = d.get('issues') or []\n    sugg = d.get('suggestions') or\
-          \ []\n    return {\n        \"b_passed\": bool(passed),\n        \"b_score\"\
-          : float(score),\n        \"b_issues\": \"\\n\".join(f\"- {i}\" for i in\
-          \ issues) if issues else \"无\",\n        \"b_suggestions\": \"\\n\".join(f\"\
-          - {s}\" for s in sugg) if sugg else \"无\"\n    }\n"
+        code: "import json, re\ndef clean(t):\n    t = re.sub(r'<think>.*?</think>', '', t or '', flags=re.DOTALL)\n    t = re.sub(r'```json\\s*', '', t or '', flags=re.IGNORECASE)\n    t = re.sub(r'\\s*```', '', t or '')\n    s, e = (t or '').find('{'), (t or '').rfind('}')\n    if s != -1 and e > s:\n        t = t[s:e+1]\n    return t\ndef main(qa: str) -> dict:\n    try:\n        d = json.loads(clean(qa))\n    except Exception:\n        d = {}\n    passed = d.get('passed', False)\n    if isinstance(passed, str):\n        passed = passed.lower() == 'true'\n    try:\n        score = float(d.get('score', 0))\n    except Exception:\n        score = 0\n    issues = d.get('issues') or []\n    sugg = d.get('suggestions') or []\n    return {\n        \"b_passed\": bool(passed),\n        \"b_score\": float(score),\n        \"b_issues\": \"\\n\".join(f\"- {i}\" for i in issues) if issues else \"无\",\n        \"b_suggestions\": \"\\n\".join(f\"- {s}\" for s in sugg) if sugg else \"无\"\n    }\n"
         code_language: python3
         outputs:
           b_issues:
@@ -542,23 +527,7 @@ workflow:
         prompt_template:
         - id: 0e3acd22-7996-4a96-b86d-92b1321d341a
           role: system
-          text: "你是一名亚马逊Listing专家。请按以下步骤执行：\n\n第1步 意图解析\n读取用户的自然语言输入 {{#sys.query#}}，判断用户想生成哪些部分。\n\
-            可选部分：title(标题)、highlights(Item Highlights)、bullets(五点描述)、backend(后台搜索词)。\n\
-            将结果输出为 requested_parts 数组，例如 [\"title\"] 或 [\"title\",\"bullets\"]。\n\
-            如果用户未指定，默认输出 [\"title\",\"highlights\",\"bullets\",\"backend\"]。\n\n第2步\
-            \ 规则参考\n使用以下检索结果作为亚马逊平台规则参考，请严格遵守：\n{{#context#}}\n\n第3步 按需生成\n仅生成 requested_parts\
-            \ 中包含的部分，未要求的部分不要输出。\n标题必须 ≤75 字符（含空格）。生成后自查字符数，超出必须精简到 75 以内再输出，并如实填入\
-            \ title_length 与 title_compliant。\n\n输出必须是纯JSON，不要添加任何注释或代码围栏：\n{\n  \"\
-            requested_parts\": [\"title\",\"highlights\",\"bullets\",\"backend\"],\n\
-            \  \"title\": \"Adjustable 16 Inch Kids Bicycle with Training Wheels\"\
-            ,\n  \"title_length\": 47,\n  \"title_compliant\": true,\n  \"highlights\"\
-            : [\"Adjustable Seat\", \"Training Wheels Included\", \"Sturdy Steel Frame\"\
-            ],\n  \"bullets\": [\"Designed for kids aged 4-7\", \"Includes removable\
-            \ training wheels\", \"Lightweight steel frame\", \"Durable design\",\
-            \ \"Easy assembly\"],\n  \"backend\": [\"kids bicycle\", \"training wheels\
-            \ bike\", \"adjustable seat bike\", \"16 inch kids bike\"],\n  \"reason\"\
-            : \"说明生成依据\"\n}\n第4步 反馈修正\n你上一轮生成的内容被质检打回，原因与建议如下，请据此改进后重新生成（仅输出 requested_parts\
-            \ {中要求的部分，格式同前）：\n质检问题：\n{{#1786957848487.b_issues#}}\n优化建议：\n{{#1786957848487.b_suggestions#}}"
+          text: "你是一名资深亚马逊跨境电商 Listing 专家，精通 2026 年 7 月新规与 COSMO / A9 算法。\\n\\n# 通用规则参考（来自知识库）\\n            {{#context#}}\\n\\n# 用户输入（自然语言）\\n{{#sys.query#}}\\n\\n# 上一轮质检反馈（必须逐条处理）\\n            上一轮 Listing 未通过质检，具体问题：\\n{{#1786957848487.b_issues#}}\\n改进建议：\\n{{#1786957848487.b_suggestions#}}\\n            请针对以上问题逐条修改后重新生成；其余字段与规则完全沿用第一轮要求。\\n\\n# 任务\\n用户用自然语言描述了一款产品（可能口语化、信息不全、顺序混乱），并可能只要求生成其中某一部分。请按以下步骤：\\n            \\n**第 1 步｜意图解析（部分生成 or 全量）**\\n- 判断用户想要哪些部分：title / highlights / bullets            \\ / backend。\\n- 点名某部分 → requested_parts 只含这些；未指定 → 全量四项。\\n- 用户给了现有内容 →            \\ 基于它优化而非从零；没给则从零生成。\\n\\n**第 2 步｜提取关键信息**\\n提取产品类型 / 尺寸 / 适龄人群 / 材质 / 核心卖点            \\ / 目标市场 / 语种等。\\n\\n**第 2.5 步｜事实依据门禁（防编造，优先于生成）**\\n- 把内容分成两类：硬事实（材质 / 尺寸            \\ / 规格 / 认证 / 数量，必须溯源）与软卖点（人群 / 场景 / 定性利益）。\\n- 硬事实只能来自：① 用户输入 ② 类目共识（仅作通用措辞，不得伪称本商品专属参数）。二者皆无            \\ → 该硬事实不写，改用软卖点，并记录到 needs_clarification。\\n- 有需求才建议补全数据：仅当缺失的硬事实属于本类目关键决策属性（如车架材质            \\ / 轮径 / 辅助轮），或用户点名但未给值时，才在 data_suggestions 给出\\\"补全真实数据\\\"建议；非关键属性缺失则安静省略，不触发建议。\\n            - 软卖点可自由使用，但不得伪装成可量化参数。绝不虚构任何材质 / 尺寸 / 认证来凑满字段。\\n- 缺失硬事实输出标注（通用格式）：凡因\"二类皆无\"而未写的硬事实（品牌 / 材质 / 尺寸 / 规格 / 认证 / 数量 / 兼容平台 / 连接方式 / 适龄），在对应字段用 [待补XX] 占位（如标题 [待补品牌名]、Highlights 内 [待补材质]、Bullets 内 [待补兼容平台]），并全部记入 needs_clarification；禁止用 BrandName / Generic 等模糊词糊弄。\\n\\n**第 3 步｜定向生成（严格遵守下方\\\n            \\ 2026 新规）**\\n\\n【标题 title，≤75 字符】结构：[品牌名]+[核心品类词]+[1个最强差异化属性]；品牌名前置；前30字符放核心流量大词；禁止堆砌>3场景词、禁止虚词；核心词留标题。\n- 品牌名取值铁律（严禁写 BrandName / Generic / YourBrand 等无意义占位词）：① 用户已给真实品牌 → 直接用；② 竞品 brands 列表存在清晰头部品牌（如 Xbox / PlayStation / Owala）→ 可借用其命名风格作示例，但标题品牌位必须写 [待补品牌名] 明确告知需替换，不得伪称本商品即该品牌；③ 二者皆无 → 标题品牌位写 [待补品牌名]，并在 needs_clarification 记入 brand。\\n\n            【Item Highlights，≤125字符，属性标签非句子】短句词条逗号分隔，覆盖材质+场景+功能+规格。\\n【Bullet Points，4-5条，适配COSMO】每条[场景/痛点]+[如何解决]+[获得利益]；前1-2条嵌入核心关键词；单条≤150字符，禁ALL\n            \\ CAPS。\\n【Backend Search Terms，≤249字节】同义/长尾变体，不重复前两层。\\n- requested_parts\n            \\ 之外的字段返回空字符串/空数组。\\n\\n**第 4 步｜标题长度自检（强制）**\\n生成 title 后数字符数（含空格标点）。>75\n            \\ 必须回缩（删修饰词、合并场景词），保留\\\"品牌前置+前30字符含核心词\\\"。回填 title_length，title_compliant\n            \\ 填 true。\\n\\n# 输出（严格只输出 JSON，不要额外文字、不要markdown围栏）\\n{\\n  \\\"requested_parts\\\"\n            : [\\\"title\\\", \\\"highlights\\\", \\\"bullets\\\", \\\"backend\\\"],\\n  \\\"title\\\"\n            : \\\"≤75字符标题\\\",\\n  \\\"title_length\\\": 数字,\\n  \\\"title_compliant\\\": true,\\n\n            \\  \\\"highlights\\\": [\\\"标签1\\\", \\\"标签2\\\"],\\n  \\\"bullets\\\": [\\\"4-5条场景化五点\\\"\n            ],\\n  \\\"backend\\\": [\\\"长尾补充词\\\"],\\n  \\\"category\\\": \\\"类目\\\",\\n  \\\"language\\\"\n            : \\\"en/zh/ja\\\",\\n  \\\"needs_clarification\\\": [\\\"未提供的硬事实如wheel_size\\\"],\\n\n            \\  \\\"data_suggestions\\\": [\\\"关键属性缺失建议提供真实参数\\\"]\\n}\""
         selected: false
         structured_output_enabled: false
         title: LLM A2
@@ -580,47 +549,8 @@ workflow:
       width: 242
       zIndex: 0
     - data:
-        code: "import json, re\ndef clean(t):\n    t = re.sub(r'<think>.*?</think>',\
-          \ '', t or '', flags=re.DOTALL)\n    t = re.sub(r'```json\\s*', '', t or\
-          \ '', flags=re.IGNORECASE)\n    t = re.sub(r'\\s*```', '', t or '')\n  \
-          \  s, e = (t or '').find('{'), (t or '').rfind('}')\n    if s != -1 and\
-          \ e > s:\n        t = t[s:e+1]\n    return t\ndef load(t):\n    try:\n \
-          \       return json.loads(clean(t))\n    except Exception:\n        return\
-          \ {}\ndef qa(t):\n    d = load(t)\n    passed = d.get('passed', False)\n\
-          \    if isinstance(passed, str):\n        passed = passed.lower() == 'true'\n\
-          \    try:\n        score = float(d.get('score', 0))\n    except Exception:\n\
-          \        score = 0\n    return passed, score, d\ndef render(g):\n    parts\
-          \ = g.get(\"requested_parts\", []) or [\"title\",\"highlights\",\"bullets\"\
-          ,\"backend\"]\n    lines = [\"## 生成结果\"]\n    if \"title\" in parts and\
-          \ g.get(\"title\"):\n        tl = g.get(\"title_length\") or len(g.get(\"\
-          title\",\"\"))\n        comp = g.get(\"title_compliant\")\n        lines\
-          \ += [f\"标题：{g['title']}\", f\"标题长度：{tl}字符\", f\"标题合规：{'✅ 合规' if comp else\
-          \ '❌ 不合规'}\", \"\"]\n    if \"bullets\" in parts and g.get(\"bullets\"):\n\
-          \        lines.append(\"五点描述：\")\n        for b in g[\"bullets\"]:\n   \
-          \         lines.append(f\"- {b}\")\n        lines.append(\"\")\n    if \"\
-          highlights\" in parts and g.get(\"highlights\"):\n        lines.append(\"\
-          Item Highlights：\")\n        for h in g[\"highlights\"]:\n            lines.append(f\"\
-          - {h}\")\n        lines.append(\"\")\n    if \"backend\" in parts and g.get(\"\
-          backend\"):\n        lines.append(\"后台搜索词：\")\n        for b in g[\"backend\"\
-          ]:\n            lines.append(f\"- {b}\")\n        lines.append(\"\")\n \
-          \   return \"\\n\".join(lines)\ndef main(a1,a2,a3,b1,b2,b3) -> dict:\n \
-          \   rounds = [(a1,b1),(a2,b2),(a3,b3)]\n    best = None\n    best_score\
-          \ = -1\n    for a, b in rounds:\n        if not a and not b:\n         \
-          \   continue\n        g = load(a)\n        passed, score, qd = qa(b)\n \
-          \       if passed:\n            best = (g, qd)\n            break\n    \
-          \    if score > best_score:\n            best_score = score\n          \
-          \  best = (g, qd)\n    if best is None:\n        best = (load(a1), qa(b1)[2])\n\
-          \    g, qd = best\n    out = [render(g)]\n    out.append(\"## 质检报告\")\n\
-          \    out.append(f\"状态：{'✅ 合格，可发布' if qd.get('passed') else '❌ 不合格，需重写'}\"\
-          )\n    out.append(f\"综合得分：{qd.get('score','N/A')}/10\")\n    out.append(f\"\
-          硬门槛违规：{'有' if qd.get('hard_violation') else '无'}\")\n    out.append(\"\"\
-          )\n    out.append(\"各维度评分：\")\n    for k, v in (qd.get('dimensions') or\
-          \ {}).items():\n        out.append(f\"- {k}：{v}/10\")\n    issues = qd.get('issues')\
-          \ or []\n    if issues:\n        out.append(\"\"); out.append(\"问题：\")\n\
-          \        for i in issues: out.append(f\"- {i}\")\n    sugg = qd.get('suggestions')\
-          \ or []\n    if sugg:\n        out.append(\"\"); out.append(\"优化建议：\")\n\
-          \        for s in sugg: out.append(f\"- {s}\")\n    return {\"result\":\
-          \ \"\\n\".join(out)}\n"
+        code: "import json, re\ndef clean(t):\n    t = re.sub(r'<think>.*?</think>', '', t or '', flags=re.DOTALL)\n    t = re.sub(r'```json\\s*', '', t or '', flags=re.IGNORECASE)\n    t = re.sub(r'\\s*```', '', t or '')\n    s, e = (t or '').find('{'), (t or '').rfind('}')\n    if s != -1 and e > s:\n        t = t[s:e+1]\n    return t\ndef load(t):\n    try:\n        return json.loads(clean(t))\n    except Exception:\n        return {}\ndef qa(t):\n    d = load(t)\n    passed = d.get('passed', False)\n    if isinstance(passed, str):\n        passed = passed.lower() == 'true'\n    try:\n        score = float(d.get('score', 0))\n    except Exception:\n        score = 0\n    return passed, score, d\ndef render(g):\n    parts = g.get(\"requested_parts\", []) or [\"title\",\"highlights\",\"bullets\",\"backend\"]\n    lines = [\"## 生成结果\"]\n    if \"title\" in parts and g.get(\"title\"):\n        tl = g.get(\"title_length\") or len(g.get(\"title\",\"\"))\n        comp = g.get(\"title_compliant\")\n        lines += [f\"标题：{g['title']}\", f\"标题长度：{tl}字符\", f\"标题合规：{'✅ 合规' if comp else '❌ 不合规'}\", \"\"]\n    if \"bullets\" in parts and g.get(\"bullets\"):\n        lines.append(\"五点描述：\")\n        for b in g[\"bullets\"]:\n            lines.append(f\"- {b}\")\n        lines.append(\"\")\n    if \"highlights\" in parts and g.get(\"highlights\"):\n        lines.append(\"Item Highlights：\")\n        for h in g[\"highlights\"]:\n            lines.append(f\"- {h}\")\n        lines.append(\"\")\n    if \"backend\" in parts and g.get(\"backend\"):\n        lines.append(\"后台搜索词：\")\n        for b in g[\"backend\"]:\n            lines.append(f\"- {b}\")\n        lines.append(\"\")\n    return \"\\n\".join(lines)\ndef main(a1,a2,b1,b2) -> dict:\n    rounds = [(a1,b1),(a2,b2)]\n    best = None\n    best_score = -1\n    for a, b in rounds:\n        if not a and not b:\n            continue\n        g = load(a)\n        if isinstance(g, dict):\n            t = g.get('title') or ''\n            if len(t) > 75:\n                cut = t[:75].rsplit(' ', 1)[0] if ' ' in t[:75] else t[:75]\n                g['title'] = cut; g['title_length'] = len(cut); g['title_compliant'] = True\n            g['highlights'] = [(h[:125]) for h in (g.get('highlights') or [])]\n            g['bullets'] = [(bb[:150].rsplit(' ', 1)[0] if len(bb) > 150 else bb) for bb in (g.get('bullets') or [])]\n        passed, score, qd = qa(b)\n        if isinstance(qd, dict):\n            _iss = qd.get('issues') or []\n            _kw = ['超长','150','75字符','125字符','>150','>75','>125','字符上限']\n            _kept = [i for i in _iss if not any(k in str(i) for k in _kw)]\n            if len(_kept) != len(_iss) and not _kept:\n                qd['passed'] = True; qd['hard_violation'] = False; qd['issues'] = ['无明显问题（长度类已自动校正）']\n            else:\n                qd['issues'] = _kept\n            passed = qd.get('passed', passed)\n\n        if passed:\n            best = (g, qd)\n            break\n        if score > best_score:\n            best_score = score\n            best = (g, qd)\n    if best is None:\n        g0 = load(a1)\n        if isinstance(g0, dict):\n            t0 = g0.get('title') or ''\n            if len(t0) > 75:\n                cut0 = t0[:75].rsplit(' ', 1)[0] if ' ' in t0[:75] else t0[:75]\n                g0['title'] = cut0; g0['title_length'] = len(cut0); g0['title_compliant'] = True\n            g0['highlights'] = [(h[:125]) for h in (g0.get('highlights') or [])]\n            g0['bullets'] = [(bb[:150].rsplit(' ', 1)[0] if len(bb) > 150 else bb) for bb in (g0.get('bullets') or [])]\n        qd0 = qa(b1)[2]\n        if isinstance(qd0, dict):\n            _iss = qd0.get('issues') or []\n            _kw = ['超长','150','75字符','125字符','>150','>75','>125','字符上限']\n            _kept = [i for i in _iss if not any(k in str(i) for k in _kw)]\n            if len(_kept) != len(_iss) and not _kept:\n                qd0['passed'] = True; qd0['hard_violation'] = False; qd0['issues'] = ['无明显问题（长度类已自动校正）']\n            else:\n                qd0['issues'] = _kept\n        best =\
+          \ (g0, qd0)\n    g, qd = best\n    out = [render(g)]\n    out.append(\"## 质检报告\")\n    out.append(f\"状态：{'✅ 合格，可发布' if qd.get('passed') else '❌ 不合格，需重写'}\")\n    out.append(f\"综合得分：{qd.get('score','N/A')}/10\")\n    out.append(f\"硬门槛违规：{'有' if qd.get('hard_violation') else '无'}\")\n    out.append(\"\")\n    out.append(\"各维度评分：\")\n    for k, v in (qd.get('dimensions') or {}).items():\n        out.append(f\"- {k}：{v}/10\")\n    issues = qd.get('issues') or []\n    if issues:\n        out.append(\"\"); out.append(\"问题：\")\n        for i in issues: out.append(f\"- {i}\")\n    sugg = qd.get('suggestions') or []\n    if sugg:\n        out.append(\"\"); out.append(\"优化建议：\")\n        for s in sugg: out.append(f\"- {s}\")\n    return {\"result\": \"\\n\".join(out)}\n"
         code_language: python3
         outputs:
           result:
@@ -650,16 +580,6 @@ workflow:
           - text
           value_type: string
           variable: b2
-        - value_selector:
-          - '17869604597020'
-          - text
-          value_type: string
-          variable: a3
-        - value_selector:
-          - '17869605346100'
-          - text
-          value_type: string
-          variable: b3
       height: 52
       id: '1786958804357'
       position:
@@ -693,17 +613,7 @@ workflow:
         - edition_type: basic
           id: f426b748-d160-45d6-b611-6f3508560084
           role: system
-          text: "你是一名亚马逊Listing质检专家。请根据用户需求和亚马逊平台规则，对生成内容做质量评估。\n\n第1步 读取内容\n- 用户的原始自然语言需求：{{#sys.query#}}\n\
-            - 待质检的生成内容（JSON）：{{#17869582996690.text#}}/\n- 亚马逊平台规则参考：{{#context#}}\n\
-            \n第2步 确定评估范围\n仅评估 requested_parts 中明确要求的字段。用户未要求生成的字段（如未要 highlights 或\
-            \ backend），即使为空也不判违规、不扣分。\n\n第3步 八维度评分（仅针对已生成字段）\n对每个已生成字段从以下维度打分（1-10）：\n\
-            关键词相关性、卖点吸引力、语法可读性、平台合规性（标题≤75字符、无禁用词）、COSMO/A9覆盖、2026新规合规（标题≤75、Item\
-            \ Highlights属性标签结构）、Alexa优化、多语言本地化。\n综合得分 = 八维平均分；≥8分为通过。\n\n第4步 输出\n\
-            输出纯JSON，不要代码围栏：\n{\n  \"score\": 8.5,\n  \"passed\": true,\n  \"hard_violation\"\
-            : false,\n  \"dimensions\": {\"关键词相关性\": 9, \"卖点吸引力\": 8, \"语法可读性\": 9,\
-            \ \"平台合规性\": 8, \"COSMO/A9覆盖\": 8, \"2026新规合规\": 8, \"Alexa优化\": 8, \"\
-            多语言本地化\": 8},\n  \"issues\": [],\n  \"suggestions\": [\"如有问题列出，无则空数组\"\
-            ]\n}"
+          text: '你是一名严格的亚马逊 Listing 合规质检员。依据 Amazon Listing 四大底层算法（CDQ / A9 / COSMO            \ / Alexa）与 2026 年 7 月新规，对 Listing 做全身体检并输出结构化诊断报告。\n\n# 质检规则与红线（来自知识库）\n            {{#context#}}\n\n# 待质检的 Listing（生成节点输出）\n{{#17869582996690.text#}}\n\n            # 第一步｜四柱评分（每项 0-10，先估各柱再加权得综合分）\n## 四柱综合权重：CDQ 40% / A9 25% / COSMO 25%            \ / Alexa 10%（CDQ 为命门，权重最高）\n## 各柱打分锚点（必须按实际表现判定，严禁照搬示例数字）：\n\n【CDQ 内容质量分            \ 0-10】由以下子项加权（采用 Listing Doctor 占比体系）：\n- 结构化属性 30%：标题/Highlights/Bullets/Backend            \ 中硬事实（材质/尺寸/适龄/场景）填充完整度\n- 标题 25%：≤75字符、品牌前置、前30字符核心词；>75字符 → CDQ 直接            \ 0 分\n- 变体 20%：变体关系/信息完整性（无变体数据则\"缺数据降级\"，按现有信息给分但不满分）\n- 图片 15%：主图/辅图质量（本            \ workflow 未生成图片 → 标 N/A 不计入，其余子项归一化）\n- 五点描述 5%：Bullet Points 质量\n- A+            \ 页面 5%：品牌故事/图文（本 workflow 未生成 → 标 N/A 不计入，其余子项归一化）\nCDQ 锚点：9-10 结构化属性齐全+标题完美；7-8            \ 基本完整个别软兜底；5-6 多项硬事实缺失；≤4 标题严重违规。\n\n【A9 收录健康度 0-10】核心词是否标题最前；Search            \ Terms 清洁度（无冗余堆砌）；属性填充完整度。\n锚点：9-10 核心词最前+Search Terms 清洁+属性全；7-8 核心词尚可少量冗余；5-6            \ 核心词偏后/有堆砌；≤4 核心词缺失/大量堆砌。\n\n【COSMO 意图覆盖度 0-10】Use Case（场景）/ Audience（人群）/            \ Goal（目标）/ Constraint（约束）四维度覆盖。\n锚点：9-10 四维度全覆盖且自然；7-8 覆盖3维；5-6 覆盖2维；≤4            \ 基本无场景人群表达。\n\n【Alexa 可发现性 0-10】能否被对话式购物助手推荐（Listing 是否\"说人话\"、可被自然语言问答命中）。\n            锚点：9-10 说人话可被\"适合X岁的Y推荐\"类提问命中；7-8 基本可读部分需推断；5-6 偏参数堆砌；≤4 纯堆砌无法被推荐。\n\n            # 第二步｜合规体检（逐项，命中即 P0 违规）\n标题 ≤75字符/品牌前置/前30字符核心词/禁堆砌>3场景词/禁虚词；\nItem Highlights            \ ≤125字符且为标签非句子；\nSearch Terms 清洁无堆砌；\n营销禁词。\n\n# 第三步｜改进行动清单（按优先级）\n-            \ P0 紧急（违规/硬门槛）：标题超长、品牌未前置、前30字符无核心词、Highlights写句子、五点前1-2条缺核心关键词、单条>150、ALL            \ CAPS、营销禁词。\n- P1 重要（显著拉分）：COSMO 某维度缺失、A9 核心词位置偏后、结构化属性未填。\n- P2 优化（锦上添花）：Alexa            \ 话术。\n\n# passed 判定口径（严格）\n- 命中任一 P0 违规 → passed=false\n- 无 P0 且 综合分            \ ≥ 8.5 → passed=true\n- 综合分 score = CDQ×0.4 + A9×0.25 + COSMO×0.25 +            \ Alexa×0.1，四舍五入保留一位小数。\n- dimensions 中 4 个维度必须由你根据实际表现逐项判定 0-10 分，严禁照搬示例数字。\n            \n# suggestions 规则（严格执行）\n- suggestions 包含两类：\n  ① 文本修改动作（如\"将[Brand]替换为真实品牌名并复检≤75字符\"            ）\n  ② 信息请求：找出得分最低的 1-2 个柱子，针对该柱子缺失的真实硬事实，向用户提出补全请求，格式：\n     【待你提供·{柱名}】{柱名}得分            \ X，请补充：{该维度缺失的关键信息，如材质/轮径/适龄/场景}\n  凡需用户/商家补充的真实数据，一律以\"【待你提供】\"格式写进            \ suggestions，不得伪称已获取。\n- passed=true 且无实质问题时 suggestions 必须为 []、issues            \ 为\"无明显问题\"。\n\n# 输出（严格只输出 JSON，不要额外文字、不要 markdown 围栏）\n{\n  \"score\"            : 数字(0-10),\n  \"dimensions\": {\"CDQ\": 数字, \"A9\": 数字, \"COSMO\": 数字,            \ \"Alexa\": 数字},\n  \"passed\": true或false,\n  \"hard_violation\": false,\n            \  \"issues\": [\"问题1\", \"问题2\"],\n  \"suggestions\": [\"①文本修改动作\", \"            ②【待你提供·CDQ】CDQ得分6，请补充：车架材质、轮径、适龄范围\"],\n  \"action_list\": {\"P0\": [\"            ...\"], \"P1\": [\"...\"], \"P2\": [...]}\n}"'
         selected: false
         title: LLM B2
         type: llm
@@ -724,20 +634,7 @@ workflow:
       width: 242
       zIndex: 0
     - data:
-        code: "import json, re\ndef clean(t):\n    t = re.sub(r'<think>.*?</think>',\
-          \ '', t or '', flags=re.DOTALL)\n    t = re.sub(r'```json\\s*', '', t or\
-          \ '', flags=re.IGNORECASE)\n    t = re.sub(r'\\s*```', '', t or '')\n  \
-          \  s, e = (t or '').find('{'), (t or '').rfind('}')\n    if s != -1 and\
-          \ e > s:\n        t = t[s:e+1]\n    return t\ndef main(qa: str) -> dict:\n\
-          \    try:\n        d = json.loads(clean(qa))\n    except Exception:\n  \
-          \      d = {}\n    passed = d.get('passed', False)\n    if isinstance(passed,\
-          \ str):\n        passed = passed.lower() == 'true'\n    try:\n        score\
-          \ = float(d.get('score', 0))\n    except Exception:\n        score = 0\n\
-          \    issues = d.get('issues') or []\n    sugg = d.get('suggestions') or\
-          \ []\n    return {\n        \"b_passed\": bool(passed),\n        \"b_score\"\
-          : float(score),\n        \"b_issues\": \"\\n\".join(f\"- {i}\" for i in\
-          \ issues) if issues else \"无\",\n        \"b_suggestions\": \"\\n\".join(f\"\
-          - {s}\" for s in sugg) if sugg else \"无\"\n    }\n"
+        code: "import json, re\ndef clean(t):\n    t = re.sub(r'<think>.*?</think>', '', t or '', flags=re.DOTALL)\n    t = re.sub(r'```json\\s*', '', t or '', flags=re.IGNORECASE)\n    t = re.sub(r'\\s*```', '', t or '')\n    s, e = (t or '').find('{'), (t or '').rfind('}')\n    if s != -1 and e > s:\n        t = t[s:e+1]\n    return t\ndef main(qa: str) -> dict:\n    try:\n        d = json.loads(clean(qa))\n    except Exception:\n        d = {}\n    passed = d.get('passed', False)\n    if isinstance(passed, str):\n        passed = passed.lower() == 'true'\n    try:\n        score = float(d.get('score', 0))\n    except Exception:\n        score = 0\n    issues = d.get('issues') or []\n    sugg = d.get('suggestions') or []\n    return {\n        \"b_passed\": bool(passed),\n        \"b_score\": float(score),\n        \"b_issues\": \"\\n\".join(f\"- {i}\" for i in issues) if issues else \"无\",\n        \"b_suggestions\": \"\\n\".join(f\"- {s}\" for s in sugg) if sugg else \"无\"\n    }\n"
         code_language: python3
         desc: ''
         isInIteration: false
@@ -812,54 +709,45 @@ workflow:
       width: 242
       zIndex: 0
     - data:
-        context:
-          enabled: true
-          variable_selector:
-          - '1786608707687'
-          - result
-        desc: ''
-        isInIteration: false
-        isInLoop: false
-        model:
-          completion_params:
-            temperature: 0.7
-          mode: chat
-          name: deepseek-v4-flash
-          provider: langgenius/deepseek/deepseek
-        prompt_template:
-        - id: 0e3acd22-7996-4a96-b86d-92b1321d341a
-          role: system
-          text: "你是一名亚马逊Listing专家。请按以下步骤执行：\n\n第1步 意图解析\n读取用户的自然语言输入 {{#sys.query#}}，判断用户想生成哪些部分。\n\
-            可选部分：title(标题)、highlights(Item Highlights)、bullets(五点描述)、backend(后台搜索词)。\n\
-            将结果输出为 requested_parts 数组，例如 [\"title\"] 或 [\"title\",\"bullets\"]。\n\
-            如果用户未指定，默认输出 [\"title\",\"highlights\",\"bullets\",\"backend\"]。\n\n第2步\
-            \ 规则参考\n使用以下检索结果作为亚马逊平台规则参考，请严格遵守：\n{{#context#}}\n\n第3步 按需生成\n仅生成 requested_parts\
-            \ 中包含的部分，未要求的部分不要输出。\n标题必须 ≤75 字符（含空格）。生成后自查字符数，超出必须精简到 75 以内再输出，并如实填入\
-            \ title_length 与 title_compliant。\n\n输出必须是纯JSON，不要添加任何注释或代码围栏：\n{\n  \"\
-            requested_parts\": [\"title\",\"highlights\",\"bullets\",\"backend\"],\n\
-            \  \"title\": \"Adjustable 16 Inch Kids Bicycle with Training Wheels\"\
-            ,\n  \"title_length\": 47,\n  \"title_compliant\": true,\n  \"highlights\"\
-            : [\"Adjustable Seat\", \"Training Wheels Included\", \"Sturdy Steel Frame\"\
-            ],\n  \"bullets\": [\"Designed for kids aged 4-7\", \"Includes removable\
-            \ training wheels\", \"Lightweight steel frame\", \"Durable design\",\
-            \ \"Easy assembly\"],\n  \"backend\": [\"kids bicycle\", \"training wheels\
-            \ bike\", \"adjustable seat bike\", \"16 inch kids bike\"],\n  \"reason\"\
-            : \"说明生成依据\"\n}\n第4步 反馈修正\n你上一轮生成的内容被质检打回，原因与建议如下，请据此改进后重新生成（仅输出 requested_parts\
-            \ {中要求的部分，格式同前）：\n质检问题：\n{{#17869594690530.b_issues#}}\n优化建议：\n{{#17869594690530.b_suggestions#}}"
+        authorization:
+          config: null
+          type: no-auth
+        body:
+          data: []
+          type: none
+        headers: ''
+        method: get
+        params: ''
+        retry_config:
+          max_retries: 3
+          retry_enabled: true
+          retry_interval: 100
         selected: false
-        structured_output_enabled: false
-        title: LLM A3
-        type: llm
-        vision:
-          enabled: false
-      height: 88
-      id: '17869604597020'
+        ssl_verify: true
+        timeout:
+          max_connect_timeout: 120000
+          max_read_timeout: 120000
+          max_write_timeout: 120000
+        title: comp_context
+        type: http-request
+        url: https://amazon-competitor-api.onrender.com/compete?token=sooya1030&category={{#sys.query#}}
+        variables:
+        - type: string
+          variable: body
+        - type: number
+          variable: status_code
+        - type: object
+          variable: headers
+        - type: array[file]
+          variable: files
+      height: 155
+      id: '2000000000001'
       position:
-        x: 2361.55812380147
-        y: 931.1519000383904
+        x: 146.98265418852026
+        y: 720
       positionAbsolute:
-        x: 2361.55812380147
-        y: 931.1519000383904
+        x: 146.98265418852026
+        y: 720
       selected: false
       sourcePosition: right
       targetPosition: left
@@ -867,56 +755,42 @@ workflow:
       width: 242
       zIndex: 0
     - data:
-        context:
-          enabled: false
-          variable_selector: []
-        desc: ''
-        isInIteration: false
-        isInLoop: false
-        model:
-          completion_params:
-            temperature: 0.7
-          mode: chat
-          name: deepseek-v4-flash
-          provider: langgenius/deepseek/deepseek
-        prompt_config:
-          jinja2_variables: []
-        prompt_template:
-        - edition_type: basic
-          id: f426b748-d160-45d6-b611-6f3508560084
-          role: system
-          text: "你是一名亚马逊Listing质检专家。请根据用户需求和亚马逊平台规则，对生成内容做质量评估。\n\n第1步 读取内容\n- 用户的原始自然语言需求：{{#sys.query#}}\n\
-            - 待质检的生成内容（JSON）：{{#17869604597020.text#}}\n- 亚马逊平台规则参考：{{#context#}}\n\
-            \n第2步 确定评估范围\n仅评估 requested_parts 中明确要求的字段。用户未要求生成的字段（如未要 highlights 或\
-            \ backend），即使为空也不判违规、不扣分。\n\n第3步 八维度评分（仅针对已生成字段）\n对每个已生成字段从以下维度打分（1-10）：\n\
-            关键词相关性、卖点吸引力、语法可读性、平台合规性（标题≤75字符、无禁用词）、COSMO/A9覆盖、2026新规合规（标题≤75、Item\
-            \ Highlights属性标签结构）、Alexa优化、多语言本地化。\n综合得分 = 八维平均分；≥8分为通过。\n\n第4步 输出\n\
-            输出纯JSON，不要代码围栏：\n{\n  \"score\": 8.5,\n  \"passed\": true,\n  \"hard_violation\"\
-            : false,\n  \"dimensions\": {\"关键词相关性\": 9, \"卖点吸引力\": 8, \"语法可读性\": 9,\
-            \ \"平台合规性\": 8, \"COSMO/A9覆盖\": 8, \"2026新规合规\": 8, \"Alexa优化\": 8, \"\
-            多语言本地化\": 8},\n  \"issues\": [],\n  \"suggestions\": [\"如有问题列出，无则空数组\"\
-            ]\n}"
+        code: "import json\ndef main(body: str, status_code: int = 200) -> dict:\n    try:\n        d = json.loads(body)\n    except Exception:\n        return {\"comp_context\": f\"[竞品获取失败] HTTP {status_code}: {str(body)[:1500]}\\n请基于类目共识与用户输入生成, 并提示用户服务偶发超时, 可稍后重试.\"}\n    if status_code != 200 or d.get(\"error\"):\n        return {\"comp_context\": f\"[竞品获取失败] {d.get('error') or status_code}\\n请基于类目共识与用户输入生成, 并提示用户服务偶发超时, 可稍后重试.\"}\n    stats = d.get(\"stats\", {})\n    brands = d.get(\"brands\", [])\n    anomalies = d.get(\"anomalies\", [])\n    latest = (d.get(\"latest\") or [])[:10]\n    slim = {\n        \"stats\": stats,\n        \"brands\": brands,\n        \"anomalies\": anomalies,\n        \"latest\": [{\n            \"title\": i.get(\"title\"),\n            \"brand\": i.get(\"brand\"),\n            \"price\": i.get(\"price\"),\n            \"rating\": i.get(\"rating\"),\n            \"bsr\": i.get(\"bsr\"),\n        } for i in latest]\n    }\n    return {\"comp_context\": json.dumps(slim, ensure_ascii=False, indent=2)}\n"
+        code_language: python3
+        outputs:
+          comp_context:
+            children: null
+            type: string
         selected: false
-        title: LLM B3
-        type: llm
-        vision:
-          enabled: false
-      height: 88
-      id: '17869605346100'
+        title: 裁剪 comp_context
+        type: code
+        variables:
+        - value_selector:
+          - '2000000000001'
+          - body
+          value_type: string
+          variable: body
+        - value_selector:
+          - '2000000000001'
+          - status_code
+          value_type: number
+          variable: status_code
+      height: 52
+      id: '2000000000002'
       position:
-        x: 2317.4660877737883
-        y: 706.2825162972092
+        x: 412.3165381825354
+        y: 720
       positionAbsolute:
-        x: 2317.4660877737883
-        y: 706.2825162972092
-      selected: false
+        x: 412.3165381825354
+        y: 720
+      selected: true
       sourcePosition: right
       targetPosition: left
       type: custom
       width: 242
       zIndex: 0
     viewport:
-      x: -465.5754158185837
-      y: -3.9153739606477984
-      zoom: 0.6299605403706594
+      x: 312.77347468875166
+      y: -203.65209864231826
+      zoom: 0.8572440108367627
   rag_pipeline_variables: []

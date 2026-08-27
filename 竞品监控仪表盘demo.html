@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>竞品监控仪表盘 · Kids Bicycles Demo</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#f5f6f8; --card:#ffffff; --ink:#1f2329; --muted:#8a8f99;
+    --line:#e6e8eb; --brand:#3370ff; --green:#34c759; --amber:#ff9f0a; --red:#ff3b30;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--ink);padding:24px;}
+  .wrap{max-width:1100px;margin:0 auto;}
+  header{display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:18px;}
+  h1{font-size:22px;font-weight:600;}
+  .sub{color:var(--muted);font-size:13px;margin-top:4px;}
+  .tag{display:inline-block;background:#eaf1ff;color:var(--brand);font-size:12px;padding:3px 10px;border-radius:20px;margin-top:4px;}
+  .kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:18px;}
+  .kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;}
+  .kpi .v{font-size:24px;font-weight:600;}
+  .kpi .l{font-size:12px;color:var(--muted);margin-top:4px;}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;}
+  .card h3{font-size:14px;font-weight:600;margin-bottom:10px;}
+  .card.full{grid-column:1 / -1;}
+  .note{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.5;}
+  table{width:100%;border-collapse:collapse;font-size:12px;}
+  th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);}
+  th{color:var(--muted);font-weight:500;}
+  .pill{padding:1px 8px;border-radius:10px;font-size:11px;}
+  .ok{background:#eafaf0;color:#1a7f37;}
+  .bad{background:#fdecec;color:#c0392b;}
+  .rankbar{height:10px;background:#eef1f6;border-radius:6px;overflow:hidden;}
+  .rankbar>span{display:block;height:100%;background:var(--brand);}
+  footer{margin-top:18px;font-size:12px;color:var(--muted);text-align:center;}
+  @media(max-width:760px){.kpis{grid-template-columns:repeat(2,1fr);}.grid{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>竞品监控仪表盘</h1>
+      <div class="sub">类目：Kids Bicycles（节点 1265804011）· 数据日期：<span id="date"></span></div>
+      <div class="tag">数据来源：亚马逊 Best Sellers · 飞书多维表格 Base</div>
+    </div>
+    <div class="sub">演示用快照（单日）</div>
+  </header>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div class="grid">
+    <div class="card">
+      <h3>价格带分布</h3>
+      <canvas id="priceBand" height="180"></canvas>
+    </div>
+    <div class="card">
+      <h3>品牌占比（在榜数）</h3>
+      <canvas id="brand" height="180"></canvas>
+    </div>
+    <div class="card full">
+      <h3>榜单排名 vs 价格（当前快照）</h3>
+      <canvas id="rankPrice" height="260"></canvas>
+      <div class="note">条形越靠右价格越高；颜色区分品牌。趋势线需 ≥2 天数据，今日 18:00 自动化跑通后将自动补全。</div>
+    </div>
+    <div class="card">
+      <h3>评分分布</h3>
+      <canvas id="rating" height="180"></canvas>
+    </div>
+    <div class="card">
+      <h3>数据质量</h3>
+      <div id="qualityBox"></div>
+      <div class="note">真实抓取存在字段缺失属正常现象，已打「数据质量」标记，体现数据可信度管理。</div>
+    </div>
+    <div class="card full">
+      <h3>明细（按排名）</h3>
+      <table id="detail">
+        <thead><tr><th>排名</th><th>品牌</th><th>价格</th><th>评分</th><th>评论数</th><th>数据质量</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <footer>AI PM 作品集 · 竞品监控（采集→存储→智能→展示）· 展示层 Demo</footer>
+</div>
+
+<script>
+// ---- 真实 8/11 数据（来自 amazon_bsr_20260811.json）----
+const DATA = {
+  scrape_date: "2026-08-11",
+  category: "Kids Bicycles (1265804011)",
+  records: [
+    {rank:"1",brand:"cubsala",price_usd:"$129.99",rating:"4.4",reviews:"803",quality:null},
+    {rank:"2",brand:"WEIZE",price_usd:"$79.99",rating:"4.5",reviews:"998",quality:null},
+    {rank:"3",brand:"WEIZE",price_usd:"$89.98",rating:"4.5",reviews:"1206",quality:null},
+    {rank:"4",brand:"JOYSTAR",price_usd:"$109.99",rating:"4.4",reviews:"5032",quality:null},
+    {rank:"5",brand:"Petimini",price_usd:"$98.99",rating:"4.4",reviews:"1193",quality:null},
+    {rank:"6",brand:"JOYSTAR",price_usd:"$105.99",rating:"4.3",reviews:null,quality:"评论数缺失"},
+    {rank:"7",brand:"RoyalBaby",price_usd:"$179.99",rating:"4.6",reviews:null,quality:"评论数缺失;描述缺失"},
+    {rank:"8",brand:"JOYSTAR",price_usd:"$105.99",rating:"4.1",reviews:"579",quality:"描述缺失"},
+    {rank:"9",brand:"Glerc",price_usd:"$109.99",rating:"4.6",reviews:"603",quality:"描述缺失"},
+    {rank:"10",brand:"WEIZE",price_usd:"$139.99",rating:"4.3",reviews:"149",quality:null},
+    {rank:"11",brand:"Glerc",price_usd:"$109.99",rating:"4.5",reviews:"85",quality:"描述缺失"},
+    {rank:"12",brand:"WEIZE",price_usd:"$89.98",rating:"4.3",reviews:"255",quality:null},
+    {rank:"13",brand:"AVASTA",price_usd:"$149.99",rating:"4.5",reviews:"312",quality:null},
+    {rank:"14",brand:"Glerc",price_usd:"$169.99",rating:"4.3",reviews:"392",quality:null},
+    {rank:"15",brand:"JOYSTAR",price_usd:"$129.99",rating:"4.4",reviews:"1466",quality:null},
+    {rank:"16",brand:"JOYSTAR",price_usd:"$179.99",rating:"4.3",reviews:"560",quality:null},
+    {rank:"17",brand:"WEIZE",price_usd:"$119.98",rating:"4.5",reviews:"100",quality:null},
+    {rank:"18",brand:"Glerc",price_usd:"$109.99",rating:"4.4",reviews:"938",quality:"描述缺失"},
+    {rank:"19",brand:"Glerc",price_usd:"$209.99",rating:"4.4",reviews:"416",quality:null},
+    {rank:"20",brand:"Glerc",price_usd:"$99.99",rating:"4.5",reviews:"146",quality:"描述缺失"}
+  ]
+};
+
+const num = s => { if(s==null) return null; const m = String(s).replace(/[^0-9.]/g,''); return m? parseFloat(m): null; };
+const recs = DATA.records.map(r => ({...r, rankN:num(r.rank), priceN:num(r.price_usd), ratingN:num(r.rating), reviewsN:num(r.reviews)}));
+
+document.getElementById('date').textContent = DATA.scrape_date;
+
+// KPIs
+const prices = recs.map(r=>r.priceN).filter(x=>x!=null);
+const ratings = recs.map(r=>r.ratingN).filter(x=>x!=null);
+const avg = a => a.reduce((s,x)=>s+x,0)/a.length;
+const median = a => { const b=[...a].sort((x,y)=>x-y); const m=Math.floor(b.length/2); return b.length%2? b[m] : (b[m-1]+b[m])/2; };
+const brands = {}; recs.forEach(r=>brands[r.brand]=(brands[r.brand]||0)+1);
+const qualityIssues = recs.filter(r=>r.quality).length;
+const kpis = [
+  {v: recs.length, l:"在榜商品"},
+  {v: Object.keys(brands).length, l:"品牌数"},
+  {v: "$"+median(prices).toFixed(0), l:"价格中位"},
+  {v: avg(ratings).toFixed(2), l:"平均评分"},
+  {v: qualityIssues, l:"数据缺失标记"}
+];
+document.getElementById('kpis').innerHTML = kpis.map(k=>`<div class="kpi"><div class="v">${k.v}</div><div class="l">${k.l}</div></div>`).join('');
+
+// 价格带
+const bands = {低价(<$90):0, 中($90-140):0, 高(>$140):0};
+prices.forEach(p=>{ if(p<90) bands["低价(<$90)"]++; else if(p<=140) bands["中($90-140)"]++; else bands["高(>$140)"]++; });
+new Chart(document.getElementById('priceBand'),{
+  type:'doughnut',
+  data:{labels:Object.keys(bands),datasets:[{data:Object.values(bands),backgroundColor:['#34c759','#3370ff','#ff9f0a']}]},
+  options:{plugins:{legend:{position:'bottom',labels:{font:{size:11}}}},maintainAspectRatio:false}
+});
+
+// 品牌
+const bLabels=Object.keys(brands), bVals=Object.values(brands);
+const palette=['#3370ff','#34c759','#ff9f0a','#ff3b30','#a855f7','#06b6d4','#64748b'];
+new Chart(document.getElementById('brand'),{
+  type:'bar',
+  data:{labels:bLabels,datasets:[{data:bVals,backgroundColor:palette.slice(0,bLabels.length)}]},
+  options:{indexAxis:'y',plugins:{legend:{display:false}},maintainAspectRatio:false,scales:{x:{ticks:{precision:0}}}}
+});
+
+// 排名 vs 价格
+const sorted=[...recs].sort((a,b)=>a.rankN-b.rankN);
+new Chart(document.getElementById('rankPrice'),{
+  type:'bar',
+  data:{labels:sorted.map(r=>"#"+r.rankN+" "+r.brand),datasets:[{label:'价格 USD',data:sorted.map(r=>r.priceN),backgroundColor:sorted.map(r=>palette[bLabels.indexOf(r.brand)%palette.length])}]},
+  options:{plugins:{legend:{display:false}},maintainAspectRatio:false,scales:{x:{ticks:{maxRotation:60,minRotation:45,font:{size:9}}},y:{title:{display:true,text:'USD'}}}}
+});
+
+// 评分
+const rBuckets={'≤4.1':0,'4.2-4.3':0,'4.4-4.5':0,'≥4.6':0};
+ratings.forEach(r=>{ if(r<=4.1)rBuckets['≤4.1']++; else if(r<=4.3)rBuckets['4.2-4.3']++; else if(r<=4.5)rBuckets['4.4-4.5']++; else rBuckets['≥4.6']++; });
+new Chart(document.getElementById('rating'),{
+  type:'bar',
+  data:{labels:Object.keys(rBuckets),datasets:[{data:Object.values(rBuckets),backgroundColor:'#34c759'}]},
+  options:{plugins:{legend:{display:false}},maintainAspectRatio:false,scales:{y:{ticks:{precision:0}}}}
+});
+
+// 数据质量
+document.getElementById('qualityBox').innerHTML =
+  `<div style="font-size:13px;line-height:1.8">完整记录：<b>${recs.length-qualityIssues}</b> / ${recs.length}<br>缺失记录：<b style="color:#c0392b">${qualityIssues}</b><br><span style="color:#8a8f99">缺失类型：评论数 / 商品描述</span></div>`;
+
+// 明细
+document.querySelector('#detail tbody').innerHTML = sorted.map(r=>{
+  const q = r.quality ? `<span class="pill bad">${r.quality}</span>` : `<span class="pill ok">完整</span>`;
+  return `<tr><td>${r.rankN}</td><td>${r.brand}</td><td>$${r.priceN}</td><td>${r.ratingN}</td><td>${r.reviewsN==null?'—':r.reviewsN}</td><td>${q}</td></tr>`;
+}).join('');
+</script>
+</body>
+</html>

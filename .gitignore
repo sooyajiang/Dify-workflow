@@ -7,3 +7,27 @@ __pycache__/
 
 # 凭证/环境变量
 .env
+
+# 本地运行时数据/日志/实验脚本（非源码，不入库）
+.workbuddy/
+amazon_bestseller_output/
+amazon_bestseller_kids_bicycle*
+assets/screenshots/
+pipeline_run_*.log
+warm_measure.log
+*飞书*.md
+get_chat_id.py
+monitor_intelligence.py
+scrape_*.py
+supplement_*.py
+apply_fallback_*.py
+enrich_details_*.py
+generate_*.py
+convert_price_*.py
+consolidate_history.py
+debug_page.html
+pdf_extract.txt
+bsr-4-2346793011*
+amazon_bsr*.json
+kids_bicycle_20260803.html
+dify_listing_*.png
