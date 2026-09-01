@@ -28,19 +28,48 @@ _EMPTY = {
     "rating": None, "review_count": None, "image_url": "", "url": "",
 }
 
+# 反爬对抗：复用 session 拿一次 cookie，再带 referer/sec-fetch-* 抓商品页
+_SESSION = None
+
+
+def _session():
+    global _SESSION
+    if _SESSION is None:
+        s = requests.Session()
+        s.headers.update({
+            "User-Agent": DESKTOP_UA,
+            "Accept-Language": "en-US,en;q=0.9",
+        })
+        try:
+            # 预热拿 set-cookie（amazon 部分反爬靠 session 判定）
+            s.get("https://www.amazon.com/", timeout=10)
+        except Exception:
+            pass
+        _SESSION = s
+    return _SESSION
+
 
 def _fetch(asin, ua, timeout=30, retries=2):
     url = f"https://www.amazon.com/dp/{asin}"
     headers = {
         "User-Agent": ua,
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept": ("text/html,application/xhtml+xml,application/xml;q=0.9,"
+                   "image/avif,image/webp,*/*;q=0.8"),
         "Accept-Language": "en-US,en;q=0.9",
+        "Accept-Encoding": "gzip, deflate, br",
         "Cache-Control": "no-cache",
+        "Referer": "https://www.amazon.com/",
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Site": "same-origin",
+        "Sec-Fetch-User": "?1",
+        "Upgrade-Insecure-Requests": "1",
     }
+    sess = _session()
     last_err = None
     for _ in range(retries):
         try:
-            resp = requests.get(url, headers=headers, timeout=timeout)
+            resp = sess.get(url, headers=headers, timeout=timeout)
             if resp.status_code == 200:
                 low = resp.text.lower()
                 if "captcha" in low[:8000] or "robot check" in low:
@@ -167,6 +196,7 @@ def scrape_listing(asin):
     data = _parse(html)
     data["asin"] = asin
     data["url"] = f"https://www.amazon.com/dp/{asin}"
+    data["_html_size"] = len(html)  # 诊断用：真实 amazon 商品页通常 > 500KB
     return data
 
 
