@@ -9,6 +9,7 @@
   POST /run        触发抓取(可选 ?token=); 写本地缓存, 不推送飞书
   GET  /query      返回结构化数据 JSON(供调试或独立助手使用)
   GET  /compete     一体化竞品接口(任意自然语言类目: 查缓存->无则同步现爬->返回结构化竞品); Dify 接实时竞品用此
+  GET  /listing     按 ASIN 抓取单商品详情(标题/五点/价格/评分/评论/品牌/主图); 质检 Agent 的 get_listing 工具用此
 """
 import json
 import os
@@ -20,6 +21,7 @@ from urllib.parse import unquote
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import run_pipeline as rp
 import query_core as qc
+import listing_scraper as ls
 
 SECRET = os.environ.get("RUN_SECRET", "")
 import requests
@@ -174,6 +176,25 @@ class Handler(BaseHTTPRequestHandler):
                              "msg": f"已后台启动抓取「{name}」(node={node}), 约 15-60 秒后 "
                                     f"GET /compete?category={category}&token=... 即可命中缓存.",
                              "_source": "cold_start"})
+            return
+        if path in ("/listing", "/listing/"):
+            # 按 ASIN 抓取单个商品详情（质检 Agent 的 get_listing 工具调用此）
+            if not _check_token(self.path):
+                self._send(403, {"error": "unauthorized"})
+                return
+            q = self.path.split("?", 1)[1] if "?" in self.path else ""
+            params = dict(x.split("=", 1) for x in q.split("&") if "=" in x)
+            asin = params.get("asin", "").strip()
+            if not asin:
+                self._send(400, {"error": "缺少 asin 参数",
+                                 "hint": "GET /listing?asin=B08N5WRWNW&token=..."})
+                return
+            try:
+                data = ls.scrape_listing(asin)
+            except Exception as e:
+                self._send(500, {"error": f"抓取异常: {e}"})
+                return
+            self._send(200, data)
             return
         # /report 端点已移除: 项目A 已彻底剥离飞书, 不再推送飞书日报
         # (取实时竞品请用 GET /compete?category=自然语言; 预热用 GET /warm?category=自然语言)
