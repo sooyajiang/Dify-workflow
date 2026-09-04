@@ -26,6 +26,7 @@ ASIN_RE = re.compile(r"^[A-Z0-9]{10}$", re.IGNORECASE)
 _EMPTY = {
     "title": "", "brand": "", "price": "", "bullets": [], "description": "",
     "rating": None, "review_count": None, "image_url": "", "url": "",
+    "aplus": "", "has_aplus": False,
 }
 
 # 反爬对抗：复用 session 拿一次 cookie，再带 referer/sec-fetch-* 抓商品页
@@ -139,14 +140,25 @@ def _parse(html):
         if text and not text.lower().startswith("read more"):
             out["bullets"].append(text)
 
-    # 描述 / A+ 页
+    # 描述 / A+ 页 —— 二者必须分开，不可混用
+    # 背景：商品启用 A+ 后，详情页原 description 区域会被 A+ 图文模块取代。
+    #       A+ 内容不被搜索索引（无 SEO 价值），description 才被索引。
+    #       旧版把 A+ 顶替成 description，导致抓到碎片文字（如 "Road Bikes"）
+    #       并被质检误判为"描述错填/空置"，属数据污染。
     d = soup.select_one("#productDescription")
     if d:
         out["description"] = d.get_text(" ", strip=True)[:2000]
-    else:
-        a = soup.select_one("#aplus_feature_div, #aplus")
-        if a:
-            out["description"] = a.get_text(" ", strip=True)[:2000]
+
+    a = soup.select_one("#aplus_feature_div, #aplus")
+    if a is not None:
+        aplus_text = a.get_text(" ", strip=True)
+        has_img = bool(a.select("img"))
+        # 有配图 或 有实质文本 → 才算真的启用了 A+（空占位符不算）
+        # 注意：纯图片型 A+ 的 get_text 可能几乎为空，但 has_aplus 仍应为 True，
+        #       否则质检会误判成"既无 description 也无 A+ = 描述缺失"
+        if has_img or len(aplus_text.strip()) >= 20:
+            out["has_aplus"] = True
+            out["aplus"] = aplus_text[:2000] if len(aplus_text.strip()) >= 20 else ""
 
     # 价格
     out["price"] = _parse_price(soup)
@@ -175,7 +187,15 @@ def scrape_listing(asin):
     """按 ASIN 抓取单个商品详情。
 
     返回 dict，字段：asin, title, brand, price, bullets[], description,
-    rating, review_count, image_url, url, _status, _msg
+    aplus, has_aplus, rating, review_count, image_url, url, _status, _msg, _html_size
+
+    字段说明（description vs aplus，重要）：
+      description  标准商品描述（#productDescription），~2000 字符，**被搜索索引**，有 SEO 价值
+      aplus        A+ 图文内容（#aplus_feature_div），**不被搜索索引**，只有转化价值
+      has_aplus    该商品是否启用了 A+ 内容
+      注意：商品启用 A+ 后，详情页原 description 区域会被 A+ 取代显示，
+            但 description 字段本身仍存在且仍被索引。二者不可混为一谈。
+
     _status:
       ok      抓取并解析成功（部分字段可能为空，属正常）
       error   网络失败 / ASIN 无效
