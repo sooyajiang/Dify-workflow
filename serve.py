@@ -10,7 +10,7 @@
   GET  /query      返回结构化数据 JSON(供调试或独立助手使用)
   GET  /compete     一体化竞品接口(任意自然语言类目: 查缓存->无则同步现爬->返回结构化竞品); Dify 接实时竞品用此
   GET  /listing     按 ASIN 抓取单商品详情(标题/五点/价格/评分/评论/品牌/主图); 质检 Agent 的 get_listing 工具用此
-  GET  /metrics     纯计算工具: 任意文本返回 char_count / byte_count_utf8; 质检 Agent 的 text_metrics 工具用此(确定性长度, 避免 LLM 估算误报)
+  GET  /metrics     纯计算工具: 任意文本返回 char_count(字符数); 质检 Agent 的 text_metrics 工具用此(确定性字符长度, 避免 LLM 估算误报)
 """
 import json
 import os
@@ -198,13 +198,12 @@ class Handler(BaseHTTPRequestHandler):
             self._send(200, data)
             return
         if path in ("/metrics", "/metrics/"):
-            # 纯计算工具端点: 对任意文本返回字数与 UTF-8 字节数(供质检 Agent 做确定性长度判定, 避免 LLM 估算误报)
+            # 纯计算工具端点: 对任意文本返回字符数(供质检 Agent 做确定性长度判定, 避免 LLM 估算误报)
             q = self.path.split("?", 1)[1] if "?" in self.path else ""
             params = dict(x.split("=", 1) for x in q.split("&") if "=" in x)
             text = unquote(params.get("text", ""))
             self._send(200, {
                 "char_count": len(text),
-                "byte_count_utf8": len(text.encode("utf-8")),
             })
             return
         # /report 端点已移除: 项目A 已彻底剥离飞书, 不再推送飞书日报
